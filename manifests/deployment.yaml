@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: target-exporter
+  labels:
+    app: target-exporter
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: target-exporter
+      labels:
+        app: target-exporter
+    spec:
+      containers:
+        - name: target-exporter
+          image: docker.io/cristianohelio/target-exporter:0.0.1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 2112
+      restartPolicy: Always
+  selector:
+    matchLabels:
+      app: target-exporter
