@@ -5,6 +5,9 @@ metadata:
   labels:
     release: kube-prometheus-stack
 spec:
+  namespaceSelector:
+    matchNames:
+      - target-exporter
   selector:
     matchLabels:
       app: target-exporter
