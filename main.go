@@ -3,30 +3,31 @@ package main
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"net/http"
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"net/http"
 )
 
-func recordMetrics() {
-	go func() {
-		for {
-			opsProcessed.Inc()
-			time.Sleep(2 * time.Second)
-		}
-	}()
-}
-
 var (
-	opsProcessed = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "myapp_processed_ops_total",
-		Help: "The total number of processed events",
+	gaugeNode7qs6n = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:        "cpu_diff_target",
+		ConstLabels: map[string]string{"instance": "scheduling-dev-wkld-md-0-7qs6n"},
+	})
+
+	gaugeNodeQ9qgr = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:        "cpu_diff_target",
+		ConstLabels: map[string]string{"instance": "scheduling-dev-wkld-md-0-q9qgr"},
+	})
+
+	gaugeNodeV48np = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:        "cpu_diff_target",
+		ConstLabels: map[string]string{"instance": "scheduling-dev-wkld-md-0-v48np"},
 	})
 )
 
 func main() {
-	recordMetrics()
+	gaugeNode7qs6n.Set(30)
+	gaugeNodeQ9qgr.Set(25)
+	gaugeNodeV48np.Set(40)
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(":2112", nil)
