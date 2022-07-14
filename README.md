@@ -4,7 +4,7 @@ Go service that exports a metrics endpoint with the targets for each node.
 
 ## How does it work
 
-![Overview of ServiceMonitor tagging and related elements](https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/Documentation/custom-metrics-elements.png)
+![Overview of ServiceMonitor tagging and related elements](servicemonitor.png)
 
 ### Notes 
 
