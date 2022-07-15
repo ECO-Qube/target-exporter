@@ -3,7 +3,7 @@ kind: ServiceMonitor
 metadata:
   name: target-exporter
   labels:
-    release: kube-prometheus-stack
+    release: target-exporter
 spec:
   namespaceSelector:
     matchNames:

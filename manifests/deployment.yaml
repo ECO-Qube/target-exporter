@@ -3,8 +3,6 @@ kind: Deployment
 metadata:
   name: target-exporter
   namespace: target-exporter
-  labels:
-    app: target-exporter
 spec:
   replicas: 1
   template:

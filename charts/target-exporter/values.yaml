@@ -68,4 +68,4 @@ affinity: {}
 
 # Label used by Prometheus to scrape a service. Should be the same as in the Prometheus configuration.
 scrapeLabel:
-  release: "kube-prometheus-stack"
+  release: "prometheus"

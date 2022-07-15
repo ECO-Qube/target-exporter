@@ -48,8 +48,8 @@ https://prometheus.io/docs/instrumenting/writing_exporters/#target-labels-not-st
 
 ### TODOs
 
-- [x] Prometheus doesn't have permission to scrape resources in namespaces different than its own (kube-prom-stack). It
-  would be better to place target-exporter into its own namesapce and give Promethes permission to scrape it.
+- [x] Prometheus doesn't have permission to scrape resources in namespaces different from its own (kube-prom-stack). It
+  would be better to place target-exporter into its own namespace and give Prometheus permission to scrape it.
 - [x] Create Helm chart
 - [x] Create a metric like `cpu-diff` and create a timeseries per each node with test values.
 - [ ] Publish image in GCP
