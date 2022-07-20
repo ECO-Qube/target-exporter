@@ -21,7 +21,7 @@ See also NOTES.txt
 E.g.:
 
 ```bash
-docker build -t target-exporter .
+docker build -t target-exporter --platform=linux/amd64 .
 docker login
 docker tag target-exporter cristianohelio/target-exporter:0.0.1
 docker push cristianohelio/target-exporter:0.0.1
