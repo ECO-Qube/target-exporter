@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: target-exporter
-          image: docker.io/cristianohelio/target-exporter:0.0.1
+          image: docker.io/hazxel/target-exporter:0.0.2
           imagePullPolicy: Always
           ports:
             - containerPort: 2112
