@@ -24,6 +24,10 @@ var (
 	})
 )
 
+func exportFakeEnergyTargets() {
+	// TODO: Export fake targets using fake values, e.g. P = 5kW + (cpu% * 1kW)
+}
+
 func main() {
 	gaugeNode7qs6n.Set(30)
 	gaugeNodeQ9qgr.Set(25)
