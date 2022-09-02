@@ -69,3 +69,8 @@ affinity: {}
 # Label used by Prometheus to scrape a service. Should be the same as in the Prometheus configuration.
 scrapeLabel:
   release: "prometheus"
+
+targets:
+  scheduling-dev-wkld-md-0-qnfsj: 20
+  scheduling-dev-wkld-md-0-r9mzb: 30
+  scheduling-dev-wkld-md-0-rwmt9: 50
