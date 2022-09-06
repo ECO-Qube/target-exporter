@@ -4,4 +4,4 @@ metadata:
   name: config
 data:
   config.yaml: |-
-    {{- toYaml .Values.targets | nindent 4 }}
+    {{- toYaml .Values.config | nindent 4 }}

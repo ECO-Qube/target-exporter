@@ -5,10 +5,10 @@
 replicaCount: 1
 
 image:
-  repository: docker.io/hazxel/target-exporter
+  repository: docker.io/cristianohelio/target-exporter
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "0.0.2"
+  tag: "0.0.3"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -70,7 +70,8 @@ affinity: {}
 scrapeLabel:
   release: "prometheus"
 
-targets:
-  scheduling-dev-wkld-md-0-qnfsj: 20
-  scheduling-dev-wkld-md-0-r9mzb: 30
-  scheduling-dev-wkld-md-0-rwmt9: 50
+config:
+  targets:
+    scheduling-dev-wkld-md-0-mk8gj: 20
+    scheduling-dev-wkld-md-0-thdgq: 30
+    scheduling-dev-wkld-md-0-vst5h: 50

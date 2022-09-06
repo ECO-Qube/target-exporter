@@ -23,8 +23,8 @@ E.g.:
 ```bash
 docker build -t target-exporter --platform=linux/amd64 .
 docker login
-docker tag target-exporter cristianohelio/target-exporter:0.0.1
-docker push cristianohelio/target-exporter:0.0.1
+docker tag target-exporter cristianohelio/target-exporter:0.0.3
+docker push cristianohelio/target-exporter:0.0.3
 ```
 
 then scale down & up the deployment to reapply the image (if tag didn't change, remember to set `pullPolicy: Always` in
