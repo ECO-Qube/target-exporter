@@ -3,18 +3,17 @@ package main
 import (
 	"errors"
 	"fmt"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"log"
-	"net/http"
 	"os"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Config struct {
-	Targets map[string]float64
+	TargetMetricName string             `yaml:"targetMetricName"`
+	Targets          map[string]float64 `yaml:"targets"`
 }
 
 var (
@@ -41,14 +40,11 @@ func main() {
 	for nodeName, target := range cfg.Targets {
 		fmt.Println(nodeName)
 		currentGauge := promauto.NewGauge(prometheus.GaugeOpts{
-			Name:        "cpu_diff_target",
+			Name:        cfg.TargetMetricName,
 			ConstLabels: map[string]string{"instance": nodeName},
 		})
 
 		currentGauge.Set(target)
 		gauges = append(gauges, currentGauge)
 	}
-
-	http.Handle("/metrics", promhttp.Handler())
-	http.ListenAndServe(":2112", nil)
 }

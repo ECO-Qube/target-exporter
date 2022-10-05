@@ -8,7 +8,7 @@ image:
   repository: docker.io/cristianohelio/target-exporter
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "0.0.3"
+  tag: "0.0.4"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -71,7 +71,8 @@ scrapeLabel:
   release: "prometheus"
 
 config:
+  targetMetricName: "fake_energy_target"
   targets:
-    scheduling-dev-wkld-md-0-mk8gj: 20
-    scheduling-dev-wkld-md-0-thdgq: 30
-    scheduling-dev-wkld-md-0-vst5h: 50
+    scheduling-dev-wkld-md-0-4kb8j: 15
+    scheduling-dev-wkld-md-0-9tnbl: 20
+    scheduling-dev-wkld-md-0-l4n2t: 30

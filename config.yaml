@@ -1,4 +1,5 @@
+targetMetricName: "fake_energy_target"
 targets:
-  scheduling-dev-wkld-md-0-qnfsj: 20
-  scheduling-dev-wkld-md-0-r9mzb: 30
-  scheduling-dev-wkld-md-0-rwmt9: 50
+  scheduling-dev-wkld-md-0-4kb8j: 20
+  scheduling-dev-wkld-md-0-9tnbl: 30
+  scheduling-dev-wkld-md-0-l4n2t: 50
