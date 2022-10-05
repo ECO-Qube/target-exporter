@@ -3,8 +3,10 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/yaml.v3"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -47,4 +49,7 @@ func main() {
 		currentGauge.Set(target)
 		gauges = append(gauges, currentGauge)
 	}
+
+	http.Handle("/metrics", promhttp.Handler())
+	http.ListenAndServe(":2112", nil)
 }
