@@ -73,6 +73,6 @@ scrapeLabel:
 config:
   targetMetricName: "fake_energy_target"
   targets:
-    scheduling-dev-wkld-md-0-4kb8j: 15
-    scheduling-dev-wkld-md-0-9tnbl: 20
-    scheduling-dev-wkld-md-0-l4n2t: 30
+    scheduling-dev-wkld-md-0-4kb8j: 15000
+    scheduling-dev-wkld-md-0-9tnbl: 20000
+    scheduling-dev-wkld-md-0-l4n2t: 30000
