@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/yaml.v3"
 	"log"
@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 const (
@@ -36,19 +35,18 @@ type TargetExporter struct {
 var api TargetExporter
 
 func (t *TargetExporter) StartMetrics() {
+	log.Println("Loading targets")
+	for nodeName, target := range t.cfg.Targets {
+		log.Printf("target loaded: %s\n", nodeName)
+		currentGauge := promauto.NewGauge(prometheus.GaugeOpts{
+			Name:        t.cfg.TargetMetricName,
+			ConstLabels: map[string]string{"instance": nodeName},
+		})
+
+		currentGauge.Set(target)
+		t.gauges = append(t.gauges, currentGauge)
+	}
 	go func() {
-		log.Println("Loading targets")
-		for nodeName, target := range t.cfg.Targets {
-			log.Printf("target loaded: %s\n", nodeName)
-			currentGauge := promauto.NewGauge(prometheus.GaugeOpts{
-				Name:        t.cfg.TargetMetricName,
-				ConstLabels: map[string]string{"instance": nodeName},
-			})
-
-			currentGauge.Set(target)
-			t.gauges = append(t.gauges, currentGauge)
-		}
-
 		log.Println("Starting metrics server")
 		http.Handle("/metrics", promhttp.Handler())
 		http.ListenAndServe(":2112", nil)
@@ -56,9 +54,9 @@ func (t *TargetExporter) StartMetrics() {
 }
 
 func (t *TargetExporter) StartApi() {
+	t.srv = setupRoutes()
 	go func() {
 		log.Println("Starting API server")
-		t.srv = setupRoutes()
 		if err := t.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
@@ -129,7 +127,6 @@ func main() {
 	// the request it is currently handling
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	fmt.Print("ping")
 	if err := api.GetServer().Shutdown(ctx); err != nil {
 		log.Fatal("Server forced to shutdown: ", err)
 	}
