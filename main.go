@@ -27,9 +27,10 @@ type Config struct {
 }
 
 type TargetExporter struct {
-	srv    *http.Server
-	cfg    *Config
-	gauges []prometheus.Gauge
+	apiSrv     *http.Server
+	metricsSrv *http.Server
+	cfg        *Config
+	gauges     []prometheus.Gauge
 }
 
 var api TargetExporter
@@ -42,29 +43,38 @@ func (t *TargetExporter) StartMetrics() {
 			Name:        t.cfg.TargetMetricName,
 			ConstLabels: map[string]string{"instance": nodeName},
 		})
-
 		currentGauge.Set(target)
 		t.gauges = append(t.gauges, currentGauge)
 	}
+	t.metricsSrv = &http.Server{
+		Addr:    ":2112",
+		Handler: promhttp.Handler(),
+	}
+
 	go func() {
 		log.Println("Starting metrics server")
-		http.Handle("/metrics", promhttp.Handler())
-		_ = http.ListenAndServe(":2112", nil)
-	}()
-}
-
-func (t *TargetExporter) StartApi() {
-	t.srv = setupRoutes()
-	go func() {
-		log.Println("Starting API server")
-		if err := t.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := t.metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
 }
 
-func (t *TargetExporter) GetServer() *http.Server {
-	return t.srv
+func (t *TargetExporter) StartApi() {
+	t.apiSrv = setupRoutes()
+	go func() {
+		log.Println("Starting API server")
+		if err := t.apiSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+}
+
+func (t *TargetExporter) GetApiServer() *http.Server {
+	return t.apiSrv
+}
+
+func (t *TargetExporter) GetMetricsServer() {
+
 }
 
 func GetTargets(g *gin.Context) {
@@ -128,9 +138,11 @@ func main() {
 	// the request it is currently handling
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := api.GetServer().Shutdown(ctx); err != nil {
-		log.Fatal("Server forced to shutdown: ", err)
+	if err := api.GetApiServer().Shutdown(ctx); err != nil {
+		log.Fatal("API server forced to shutdown: ", err)
 	}
-
-	log.Println("Server exiting")
+	if err := api.GetApiServer().Shutdown(ctx); err != nil {
+		log.Fatal("Metrics server forced to shutdown: ", err)
+	}
+	log.Println("Target Exporter exiting")
 }

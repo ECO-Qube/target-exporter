@@ -52,8 +52,8 @@ https://prometheus.io/docs/instrumenting/writing_exporters/#target-labels-not-st
   would be better to place target-exporter into its own namespace and give Prometheus permission to scrape it.
 - [x] Create Helm chart
 - [x] Create a metric like `cpu-diff` and create a timeseries per each node with test values.
-- [ ] Publish image in GCP
+- [x] Graceful shutdown
   registry https://console.cloud.google.com/gcr/images/k8s-ecoqube-development?project=k8s-ecoqube-development
 - [ ] Swap out plain Prometheus in TAS cluster for kube-prometheus-stack or just add the Prometheus Operator and deploy
-  service
+  service. Would be cool to then propose it as a PR to the TAS team.
 - [ ] Health and readiness checks
