@@ -61,6 +61,7 @@ func (t *TargetExporter) StartMetrics() {
 
 func (t *TargetExporter) StartApi() {
 	t.apiSrv = setupRoutes()
+
 	go func() {
 		log.Println("Starting API server")
 		if err := t.apiSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -73,8 +74,8 @@ func (t *TargetExporter) GetApiServer() *http.Server {
 	return t.apiSrv
 }
 
-func (t *TargetExporter) GetMetricsServer() {
-
+func (t *TargetExporter) GetMetricsServer() *http.Server {
+	return t.metricsSrv
 }
 
 func GetTargets(g *gin.Context) {
@@ -141,7 +142,7 @@ func main() {
 	if err := api.GetApiServer().Shutdown(ctx); err != nil {
 		log.Fatal("API server forced to shutdown: ", err)
 	}
-	if err := api.GetApiServer().Shutdown(ctx); err != nil {
+	if err := api.GetMetricsServer().Shutdown(ctx); err != nil {
 		log.Fatal("Metrics server forced to shutdown: ", err)
 	}
 	log.Println("Target Exporter exiting")
