@@ -49,7 +49,7 @@ func (t *TargetExporter) StartMetrics() {
 	go func() {
 		log.Println("Starting metrics server")
 		http.Handle("/metrics", promhttp.Handler())
-		http.ListenAndServe(":2112", nil)
+		_ = http.ListenAndServe(":2112", nil)
 	}()
 }
 
@@ -68,8 +68,9 @@ func (t *TargetExporter) GetServer() *http.Server {
 }
 
 func GetTargets(g *gin.Context) {
-	time.Sleep(10 * time.Second)
-	g.String(http.StatusOK, "Welcome Gin Server")
+	g.JSON(200, gin.H{
+		"targets": api.cfg.Targets,
+	})
 }
 
 func setupRoutes() *http.Server {
