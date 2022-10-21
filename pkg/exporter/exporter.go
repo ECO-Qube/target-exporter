@@ -122,7 +122,7 @@ type TargetsRequest struct {
 
 func (t *TargetExporter) postTargetsRequest(g *gin.Context) {
 	payload := TargetsRequest{}
-	if err := g.ShouldBindJSON(&payload); err != nil {
+	if err := g.BindJSON(&payload); err != nil {
 		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

@@ -35,9 +35,33 @@ kubectl scale deployment target-exporter --replicas=0 -n target-exporter
 kubectl scale deployment target-exporter --replicas=1 -n target-exporter 
 ```
 
-## How does it work
+### Testing
 
-![Overview of ServiceMonitor tagging and related elements](servicemonitor.png)
+### Get request to get targets
+
+```json
+curl localhost:8080/api/v1/targets
+```
+
+Successful response:
+
+```json
+{"targets":{"targets":{"scheduling-dev-wkld-md-0-4kb8j":100000,"scheduling-dev-wkld-md-0-9tnbl":30,"scheduling-dev-wkld-md-0-l4n2t":50}}}%                                                                           
+```
+
+#### Post request to set targets
+
+```bash
+curl -X POST localhost:8080/api/v1/targets \
+-H 'Content-Type: application/json' \
+-d '{"targets":{"scheduling-dev-wkld-md-0-4kb8j":100000,"scheduling-dev-wkld-md-0-9tnbl":30,"scheduling-dev-wkld-md-0-l4n2t":50}}'
+```
+
+Successful response:
+
+```json
+{"message":"success"}%
+```
 
 ### Notes
 
@@ -53,7 +77,8 @@ https://prometheus.io/docs/instrumenting/writing_exporters/#target-labels-not-st
 - [x] Create Helm chart
 - [x] Create a metric like `cpu-diff` and create a timeseries per each node with test values.
 - [x] Graceful shutdown
-  registry https://console.cloud.google.com/gcr/images/k8s-ecoqube-development?project=k8s-ecoqube-development
+- [x] Get and set targets through a REST API
 - [ ] Swap out plain Prometheus in TAS cluster for kube-prometheus-stack or just add the Prometheus Operator and deploy
   service. Would be cool to then propose it as a PR to the TAS team.
 - [ ] Health and readiness checks
+- [ ] Leveled logging
