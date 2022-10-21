@@ -9,6 +9,10 @@ import (
 	"net/http"
 )
 
+const (
+	ErrNodeNonexistent = "specified node(s) does not exist"
+)
+
 type Config struct {
 	TargetMetricName string             `yaml:"targetMetricName"`
 	Targets          map[string]float64 `yaml:"targets"`
@@ -126,12 +130,27 @@ func (t *TargetExporter) postTargetsRequest(g *gin.Context) {
 		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	// For now, any missing node in the payload will fail the whole request. Might make this more lenient in the future.
+	if missingNodes := checkMissingNodes(t.targets, payload.Targets); len(missingNodes) > 0 {
+		g.JSON(http.StatusBadRequest, gin.H{"error": ErrNodeNonexistent, "nodes": missingNodes})
+		return
+	}
 	for node, target := range payload.Targets {
-		if _, ok := t.Targets()[node]; ok {
-			t.Targets()[node].Set(target)
-		}
+		t.Targets()[node].Set(target)
 	}
 	g.JSON(200, gin.H{
 		"message": "success",
 	})
+}
+
+// Helper function to find missing nodes from one map where key is node name, and a map of node names to *Target.
+// Returns nil if no missing nodes were found.
+func checkMissingNodes(targets map[string]*Target, targetsToCheck map[string]float64) []string {
+	missing := make([]string, 0)
+	for node, _ := range targetsToCheck {
+		if _, exists := targets[node]; !exists {
+			missing = append(missing, node)
+		}
+	}
+	return missing
 }
