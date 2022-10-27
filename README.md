@@ -46,7 +46,7 @@ curl localhost:8080/api/v1/targets
 Successful response:
 
 ```json
-{"targets":{"targets":{"scheduling-dev-wkld-md-0-4kb8j":100000,"scheduling-dev-wkld-md-0-9tnbl":30,"scheduling-dev-wkld-md-0-l4n2t":50}}}%                                                                           
+{"targets":{"scheduling-dev-wkld-md-0-4kb8j":100000,"scheduling-dev-wkld-md-0-9tnbl":30,"scheduling-dev-wkld-md-0-l4n2t":50}}%                                                                           
 ```
 
 #### Post request to set targets
