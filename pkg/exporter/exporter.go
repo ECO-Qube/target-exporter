@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"git.helio.dev/eco-qube/target-exporter/pkg/middlewares"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -77,7 +78,8 @@ func (t *TargetExporter) StartMetrics() {
 func (t *TargetExporter) StartApi() {
 	// Setup routes
 	r := gin.Default()
-	v1 := r.Group("/api/v1")
+	// TODO: Use CorsEnabledServer only during development; add a CLI flag to set development mode.
+	v1 := r.Group("/api/v1", middlewares.CorsEnabledMiddleware)
 	{
 		v1.GET("/targets", t.getTargetsResponse)
 		v1.POST("/targets", t.postTargetsRequest)
@@ -86,6 +88,7 @@ func (t *TargetExporter) StartApi() {
 		Addr:    ":8080",
 		Handler: r,
 	}
+
 	t.apiSrv = srv
 
 	go func() {
@@ -115,9 +118,7 @@ func (t *TargetExporter) getTargetsResponse(g *gin.Context) {
 	for node, target := range t.targets {
 		payload.Targets[node] = target.GetTarget()
 	}
-	g.JSON(200, gin.H{
-		"targets": payload,
-	})
+	g.JSON(200, payload)
 }
 
 type TargetsRequest struct {
