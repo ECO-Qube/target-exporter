@@ -35,11 +35,11 @@ func (api *Target) GetTarget() float64 {
 type TargetExporter struct {
 	apiSrv     *http.Server
 	metricsSrv *http.Server
-	bootCfg    *Config
+	bootCfg    Config
 	targets    map[string]*Target
 }
 
-func NewTargetExporter(cfg *Config) *TargetExporter {
+func NewTargetExporter(cfg Config) *TargetExporter {
 	return &TargetExporter{
 		bootCfg: cfg,
 		targets: make(map[string]*Target),

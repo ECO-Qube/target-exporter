@@ -32,7 +32,7 @@ func init() {
 	if err != nil {
 		log.Fatalf("%s: %v", ErrLoadingConfigFile, err)
 	}
-	api = NewTargetExporter(&cfg)
+	api = NewTargetExporter(cfg)
 }
 
 func main() {
