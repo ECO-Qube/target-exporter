@@ -114,6 +114,9 @@ type TargetsResponse struct {
 }
 
 func (t *TargetExporter) getTargetsResponse(g *gin.Context) {
+	// TODO: Remove debug code
+	// time.Sleep(500 * time.Millisecond)
+	// g.JSON(404, "error")
 	payload := TargetsResponse{Targets: make(map[string]float64)}
 	for node, target := range t.targets {
 		payload.Targets[node] = target.GetTarget()
