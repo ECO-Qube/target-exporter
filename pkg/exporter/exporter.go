@@ -38,12 +38,14 @@ type TargetExporter struct {
 	metricsSrv *http.Server
 	bootCfg    Config
 	targets    map[string]*Target
+	debugMode  bool
 }
 
-func NewTargetExporter(cfg Config) *TargetExporter {
+func NewTargetExporter(cfg Config, debugMode bool) *TargetExporter {
 	return &TargetExporter{
-		bootCfg: cfg,
-		targets: make(map[string]*Target),
+		bootCfg:   cfg,
+		targets:   make(map[string]*Target),
+		debugMode: debugMode,
 	}
 }
 
@@ -78,8 +80,11 @@ func (t *TargetExporter) StartMetrics() {
 func (t *TargetExporter) StartApi() {
 	// Setup routes
 	r := gin.Default()
-	// TODO: Use CorsEnabledServer only during development; add a CLI flag to set development mode.
-	v1 := r.Group("/api/v1", middlewares.CorsEnabledMiddleware)
+
+	if t.debugMode {
+		r.Use(middlewares.CorsEnabled)
+	}
+	v1 := r.Group("/api/v1")
 	{
 		v1.GET("/targets", t.getTargetsResponse)
 		v1.POST("/targets", t.postTargetsRequest)

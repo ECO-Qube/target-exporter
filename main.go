@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"gopkg.in/yaml.v3"
 	"log"
 	"os"
@@ -19,7 +20,16 @@ const (
 
 var api *TargetExporter
 
+var isDebugModeEnabled = false
+
+func initFlags() {
+	// TODO: Make it proper with Cobra and Viper libraries
+	flag.BoolVar(&isDebugModeEnabled, "debug", isDebugModeEnabled, "enable CORS for localhost:3000")
+}
+
 func init() {
+	initFlags()
+
 	if _, err := os.Stat("./config.yaml"); errors.Is(err, os.ErrNotExist) {
 		log.Fatalf("%s: %v", ErrLoadingConfigFile, err)
 	}
@@ -32,7 +42,7 @@ func init() {
 	if err != nil {
 		log.Fatalf("%s: %v", ErrLoadingConfigFile, err)
 	}
-	api = NewTargetExporter(cfg)
+	api = NewTargetExporter(cfg, isDebugModeEnabled)
 }
 
 func main() {
