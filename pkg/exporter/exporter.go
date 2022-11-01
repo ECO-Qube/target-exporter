@@ -1,13 +1,16 @@
 package exporter
 
 import (
+	"fmt"
 	"git.helio.dev/eco-qube/target-exporter/pkg/middlewares"
+	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"log"
+	"go.uber.org/zap"
 	"net/http"
+	"time"
 )
 
 const (
@@ -34,18 +37,20 @@ func (api *Target) GetTarget() float64 {
 }
 
 type TargetExporter struct {
-	apiSrv     *http.Server
-	metricsSrv *http.Server
-	bootCfg    Config
-	targets    map[string]*Target
-	debugMode  bool
+	apiSrv      *http.Server
+	metricsSrv  *http.Server
+	logger      *zap.Logger
+	bootCfg     Config
+	targets     map[string]*Target
+	corsEnabled bool
 }
 
-func NewTargetExporter(cfg Config, debugMode bool) *TargetExporter {
+func NewTargetExporter(cfg Config, logger *zap.Logger, corsEnabled bool) *TargetExporter {
 	return &TargetExporter{
-		bootCfg:   cfg,
-		targets:   make(map[string]*Target),
-		debugMode: debugMode,
+		logger:      logger,
+		bootCfg:     cfg,
+		targets:     make(map[string]*Target),
+		corsEnabled: corsEnabled,
 	}
 }
 
@@ -54,9 +59,9 @@ func (t *TargetExporter) Targets() map[string]*Target {
 }
 
 func (t *TargetExporter) StartMetrics() {
-	log.Println("Loading targets")
+	t.logger.Info("Loading targets")
 	for nodeName, target := range t.bootCfg.Targets {
-		log.Printf("target loaded: %s\n", nodeName)
+		t.logger.Info(fmt.Sprintf("target loaded: %s\n", nodeName))
 		currentGauge := promauto.NewGauge(prometheus.GaugeOpts{
 			Name:        t.bootCfg.TargetMetricName,
 			ConstLabels: map[string]string{"instance": nodeName},
@@ -70,9 +75,9 @@ func (t *TargetExporter) StartMetrics() {
 	}
 
 	go func() {
-		log.Println("Starting metrics server")
+		t.logger.Info("Starting metrics server")
 		if err := t.metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %s\n", err)
+			t.logger.Fatal(fmt.Sprintf("listen: %s\n", err))
 		}
 	}()
 }
@@ -81,7 +86,19 @@ func (t *TargetExporter) StartApi() {
 	// Setup routes
 	r := gin.Default()
 
-	if t.debugMode {
+	// Setup logger
+
+	// Add a ginzap middleware, which:
+	//   - Logs all requests, like a combined access and error log.
+	//   - Logs to stdout.
+	//   - RFC3339 with UTC time format.
+	r.Use(ginzap.Ginzap(t.logger, time.RFC3339, true))
+
+	// Logs all panic to error log
+	//   - stack means whether output the stack info.
+	r.Use(ginzap.RecoveryWithZap(t.logger, true))
+
+	if t.corsEnabled {
 		r.Use(middlewares.CorsEnabled)
 	}
 	v1 := r.Group("/api/v1")
@@ -97,9 +114,9 @@ func (t *TargetExporter) StartApi() {
 	t.apiSrv = srv
 
 	go func() {
-		log.Println("Starting API server")
+		t.logger.Info("Starting API server")
 		if err := t.apiSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %s\n", err)
+			t.logger.Fatal(fmt.Sprintf("listen: %s\n", err))
 		}
 	}()
 }

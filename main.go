@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -20,29 +21,37 @@ const (
 
 var api *TargetExporter
 
-var isDebugModeEnabled = false
+var isCorsEnabled = false
+var logger *zap.Logger
+
+func initLogger() {
+	logger, _ = zap.NewProduction()
+}
 
 func initFlags() {
 	// TODO: Make it proper with Cobra and Viper libraries
-	flag.BoolVar(&isDebugModeEnabled, "debug", isDebugModeEnabled, "enable CORS for localhost:3000")
+	flag.BoolVar(&isCorsEnabled, "cors-enabled", isCorsEnabled, "enable CORS for localhost:3000")
+
+	flag.Parse()
 }
 
 func init() {
+	initLogger()
 	initFlags()
 
 	if _, err := os.Stat("./config.yaml"); errors.Is(err, os.ErrNotExist) {
-		log.Fatalf("%s: %v", ErrLoadingConfigFile, err)
+		logger.Fatal(fmt.Sprintf("%s: %v", ErrLoadingConfigFile, err))
 	}
 	file, err := os.ReadFile("./config.yaml")
 	if err != nil {
-		log.Fatalf("%s: %v", ErrLoadingConfigFile, err)
+		logger.Fatal(fmt.Sprintf("%s: %v", ErrLoadingConfigFile, err))
 	}
 	cfg := Config{}
 	err = yaml.Unmarshal(file, &cfg)
 	if err != nil {
-		log.Fatalf("%s: %v", ErrLoadingConfigFile, err)
+		logger.Fatal(fmt.Sprintf("%s: %v", ErrLoadingConfigFile, err))
 	}
-	api = NewTargetExporter(cfg, isDebugModeEnabled)
+	api = NewTargetExporter(cfg, logger, isCorsEnabled)
 }
 
 func main() {
@@ -59,17 +68,17 @@ func main() {
 
 	// Restore default behavior on the interrupt signal and notify user of shutdown
 	stop()
-	log.Println("Shutting down gracefully, press Ctrl+C again to force")
+	logger.Info("Shutting down gracefully, press Ctrl+C again to force")
 
 	// The context is used to inform the server it has 30 seconds to finish
 	// the request it is currently handling
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := api.GetApiServer().Shutdown(ctx); err != nil {
-		log.Fatal("API server forced to shutdown: ", err)
+		logger.Fatal(fmt.Sprintf("API server forced to shutdown: %s", err))
 	}
 	if err := api.GetMetricsServer().Shutdown(ctx); err != nil {
-		log.Fatal("Metrics server forced to shutdown: ", err)
+		logger.Fatal(fmt.Sprintf("Metrics server forced to shutdown: %s", err))
 	}
-	log.Println("Target Exporter exiting")
+	logger.Info("Target Exporter exiting")
 }
