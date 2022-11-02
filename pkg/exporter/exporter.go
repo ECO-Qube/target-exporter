@@ -11,6 +11,8 @@ import (
 	"go.uber.org/zap"
 	"net/http"
 	"time"
+
+	. "git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
 )
 
 const (
@@ -39,14 +41,16 @@ func (api *Target) GetTarget() float64 {
 type TargetExporter struct {
 	apiSrv      *http.Server
 	metricsSrv  *http.Server
+	kubeClient  *Kubeclient
 	logger      *zap.Logger
 	bootCfg     Config
 	targets     map[string]*Target
 	corsEnabled bool
 }
 
-func NewTargetExporter(cfg Config, logger *zap.Logger, corsEnabled bool) *TargetExporter {
+func NewTargetExporter(cfg Config, kubeClient *Kubeclient, logger *zap.Logger, corsEnabled bool) *TargetExporter {
 	return &TargetExporter{
+		kubeClient:  kubeClient,
 		logger:      logger,
 		bootCfg:     cfg,
 		targets:     make(map[string]*Target),

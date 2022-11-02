@@ -7,38 +7,54 @@ import (
 	"fmt"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	. "git.helio.dev/eco-qube/target-exporter/pkg/exporter"
+	. "git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
 )
 
 const (
 	ErrLoadingConfigFile = "error loading config file"
 )
 
-var api *TargetExporter
+var (
+	api        *TargetExporter
+	kubeclient *Kubeclient
+	cfg        Config
+	logger     *zap.Logger
 
-var isCorsEnabled = false
-var logger *zap.Logger
+	// Flags
+	isCorsEnabled = false
+	kubeconfig    = ""
+)
 
 func initLogger() {
 	logger, _ = zap.NewProduction()
 }
 
 func initFlags() {
-	// TODO: Make it proper with Cobra and Viper libraries
+	// TODO: Make it proper with Cobra and Viper libraries maybe
 	flag.BoolVar(&isCorsEnabled, "cors-enabled", isCorsEnabled, "enable CORS for localhost:3000")
+
+	// If homedir is not set, kubeconfig will be set to empty string
+	if home := homedir.HomeDir(); home != "" {
+		flag.StringVar(&kubeconfig, "kubeconfig", filepath.Join(home, ".kube", "config"),
+			"(optional) absolute path to the kubeconfig file")
+	} else {
+		flag.StringVar(&kubeconfig, "kubeconfig", "", "absolute path to the kubeconfig file")
+	}
 
 	flag.Parse()
 }
 
-func init() {
-	initLogger()
-	initFlags()
-
+func initCfgFile() {
 	if _, err := os.Stat("./config.yaml"); errors.Is(err, os.ErrNotExist) {
 		logger.Fatal(fmt.Sprintf("%s: %v", ErrLoadingConfigFile, err))
 	}
@@ -46,20 +62,40 @@ func init() {
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("%s: %v", ErrLoadingConfigFile, err))
 	}
-	cfg := Config{}
+	cfg = Config{}
 	err = yaml.Unmarshal(file, &cfg)
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("%s: %v", ErrLoadingConfigFile, err))
 	}
-	api = NewTargetExporter(cfg, logger, isCorsEnabled)
+}
+
+func initKubeClient() {
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		logger.Fatal(fmt.Sprintf("Error building kubeconfig: %s", err.Error()))
+	}
+
+	kubeclientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		logger.Fatal(fmt.Sprintf("Error building kubernetes clientset: %s", err.Error()))
+	}
+
+	kubeclient = NewKubeClient(kubeclientset, logger)
+}
+
+func init() {
+	initLogger()
+	initFlags()
+	initCfgFile()
+	initKubeClient()
+
+	api = NewTargetExporter(cfg, kubeclient, logger, isCorsEnabled)
 }
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// TODO: Use gin to create the API
-	// TODO: Implement graceful shutdown using context
 	api.StartMetrics()
 	api.StartApi()
 
