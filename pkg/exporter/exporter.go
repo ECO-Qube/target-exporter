@@ -109,6 +109,8 @@ func (t *TargetExporter) StartApi() {
 	{
 		v1.GET("/targets", t.getTargetsResponse)
 		v1.POST("/targets", t.postTargetsRequest)
+
+		v1.GET("/workloads", t.getWorkloads)
 	}
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -147,7 +149,7 @@ func (t *TargetExporter) getTargetsResponse(g *gin.Context) {
 	for node, target := range t.targets {
 		payload.Targets[node] = target.GetTarget()
 	}
-	g.JSON(200, payload)
+	g.JSON(http.StatusOK, payload)
 }
 
 type TargetsRequest struct {
@@ -168,9 +170,40 @@ func (t *TargetExporter) postTargetsRequest(g *gin.Context) {
 	for node, target := range payload.Targets {
 		t.Targets()[node].Set(target)
 	}
-	g.JSON(200, gin.H{
+	g.JSON(http.StatusOK, gin.H{
 		"message": "success",
 	})
+}
+
+type Workload struct {
+	Name           string `json:"name"`
+	Status         string `json:"status"`
+	SubmissionDate string `json:"submissionDate"`
+	NodeName       string `json:"hostName"`
+}
+
+type WorkloadsList struct {
+	Workloads []Workload `json:"workloads"`
+}
+
+// TODO: Make configurable with namespace or label selector
+func (t *TargetExporter) getWorkloads(g *gin.Context) {
+	pods, err := t.kubeClient.GetNodeList()
+	if err != nil {
+		// TODO: More granular error handling
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	workloads := make([]Workload, len(pods.Items))
+	for i, pod := range pods.Items {
+		workloads[i] = Workload{
+			Name:           pod.Name,
+			Status:         string(pod.Status.Phase),
+			SubmissionDate: pod.CreationTimestamp.String(),
+			NodeName:       pod.Spec.NodeName,
+		}
+	}
+	g.JSON(http.StatusOK, WorkloadsList{Workloads: workloads})
 }
 
 // Helper function to find missing nodes from one map where key is node name, and a map of node names to *Target.

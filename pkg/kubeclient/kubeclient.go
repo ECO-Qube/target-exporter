@@ -2,8 +2,8 @@ package kubeclient
 
 import (
 	"context"
-	"fmt"
 	"go.uber.org/zap"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	//
@@ -27,12 +27,14 @@ func NewKubeClient(client *kubernetes.Clientset, logger *zap.Logger) *Kubeclient
 }
 
 // https://github.com/kubernetes/client-go/blob/master/examples/out-of-cluster-client-configuration/main.go
-func (kubeclient *Kubeclient) GetPodsInKubeSystem() {
+func (kubeclient *Kubeclient) GetNodeList() (*v1.PodList, error) {
+	// TODO: Make namespace configurable or get via label selection
 	pods, err := kubeclient.CoreV1().Pods("kube-system").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		kubeclient.logger.Fatal("Error getting pods", zap.Error(err))
+		kubeclient.logger.Error("Error getting pods", zap.Error(err))
+		return nil, err
 	}
-	fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
+	return pods, nil
 
 	// Examples for error handling:
 	// - Use helper functions like e.g. errors.IsNotFound()
