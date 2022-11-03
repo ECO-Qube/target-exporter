@@ -179,7 +179,7 @@ type Workload struct {
 	Name           string `json:"name"`
 	Status         string `json:"status"`
 	SubmissionDate string `json:"submissionDate"`
-	NodeName       string `json:"hostName"`
+	NodeName       string `json:"nodeName"`
 }
 
 type WorkloadsList struct {
