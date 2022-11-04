@@ -1,7 +1,6 @@
 package middlewares
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,8 +15,6 @@ func CorsEnabled(c *gin.Context) {
 		c.AbortWithStatus(204)
 		return
 	}
-
-	fmt.Println("middleware loaded")
 
 	c.Next()
 }

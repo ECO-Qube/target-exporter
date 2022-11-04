@@ -111,6 +111,7 @@ func (t *TargetExporter) StartApi() {
 		v1.POST("/targets", t.postTargetsRequest)
 
 		v1.GET("/workloads", t.getWorkloads)
+		v1.POST("/workloads", t.postWorkloads)
 	}
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -205,6 +206,20 @@ func (t *TargetExporter) getWorkloads(g *gin.Context) {
 	}
 	g.JSON(http.StatusOK, WorkloadsList{Workloads: workloads})
 }
+
+func (t *TargetExporter) postWorkloads(g *gin.Context) {
+	err := t.kubeClient.SpawnNewWorkload()
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	g.JSON(http.StatusOK, gin.H{
+		"message": "success",
+	})
+}
+
+/************* HELPER FUNCTIONS *************/
 
 // Helper function to find missing nodes from one map where key is node name, and a map of node names to *Target.
 // Returns nil if no missing nodes were found.
