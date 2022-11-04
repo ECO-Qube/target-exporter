@@ -189,7 +189,7 @@ type WorkloadsList struct {
 
 // TODO: Make configurable with namespace or label selector
 func (t *TargetExporter) getWorkloads(g *gin.Context) {
-	pods, err := t.kubeClient.GetNodeList()
+	pods, err := t.kubeClient.GetPodsInNamespace()
 	if err != nil {
 		// TODO: More granular error handling
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

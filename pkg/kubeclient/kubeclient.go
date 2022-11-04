@@ -68,36 +68,32 @@ import (
 
 const stressTestJob25 = `
 apiVersion: batch/v1
-kind: CronJob
+kind: Job
 metadata:
- name: 25-cpu-stresstest-cron
- namespace: default
+  name: 25-cpu-stresstest-cron
+  namespace: default
 spec:
- schedule: "*/1 * * * *" # every minute
- jobTemplate:
-   spec:
-     template:
-       metadata:
-         labels:
-           app: 25-cpu-stresstest-cron
-       spec:
-         containers:
-         - name: 25-cpu-stresstest-cron
-           image: petarmaric/docker.cpu-stress-test
-           imagePullPolicy: IfNotPresent
-           env:
-             - name: MAX_CPU_CORES
-               value: "1"
-             - name: STRESS_SYSTEM_FOR
-               value: "1m"
-           resources:
-             requests:
-               cpu: "250m"
-             limits:
-               cpu: "250m"
-         restartPolicy: Never
-     parallelism: 1
-     completions: 1
+  template:
+    metadata:
+      labels:
+        app: 25-cpu-stresstest-cron
+    spec:
+      containers:
+        - name: 25-cpu-stresstest-cron
+          image: petarmaric/docker.cpu-stress-test
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MAX_CPU_CORES
+              value: '1'
+            - name: STRESS_SYSTEM_FOR
+              value: 1m
+          resources:
+            requests:
+              cpu: 250m
+            limits:
+              cpu: 250m
+      restartPolicy: Never
+  backoffLimit: 4
 `
 
 type Kubeclient struct {
@@ -111,9 +107,9 @@ func NewKubeClient(client *kubernetes.Clientset, logger *zap.Logger) *Kubeclient
 }
 
 // https://github.com/kubernetes/client-go/blob/master/examples/out-of-cluster-client-configuration/main.go
-func (kubeclient *Kubeclient) GetNodeList() (*v1.PodList, error) {
+func (kubeclient *Kubeclient) GetPodsInNamespace() (*v1.PodList, error) {
 	// TODO: Make namespace configurable or get via label selection
-	pods, err := kubeclient.CoreV1().Pods("kube-system").List(context.TODO(), metav1.ListOptions{})
+	pods, err := kubeclient.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		kubeclient.logger.Error("Error getting pods", zap.Error(err))
 		return nil, err
@@ -141,23 +137,23 @@ func (kubeclient *Kubeclient) GetNodeList() (*v1.PodList, error) {
 // SpawnNewWorkload creates a new stress test workload
 func (kubeclient *Kubeclient) SpawnNewWorkload() error {
 	// TODO: Parametrize...
-	var cronjob *v1batch.CronJob
-	err := yaml.NewYAMLOrJSONDecoder(strings.NewReader(stressTestJob25), len(stressTestJob25)).Decode(&cronjob)
+	var job *v1batch.Job
+	err := yaml.NewYAMLOrJSONDecoder(strings.NewReader(stressTestJob25), len(stressTestJob25)).Decode(&job)
 	if err != nil {
 		kubeclient.logger.Error("Error decoding yaml", zap.Error(err))
 		return err
 	}
-	kubeclient.logger.Info("Spawning cronjob", zap.String("name", cronjob.Name))
+	kubeclient.logger.Info("Spawning cronjob", zap.String("name", job.Name))
 
-	cronjob.Name = cronjob.Name + "-" + uuid.New().String()[0:8]
+	job.Name = job.Name + "-" + uuid.New().String()[0:8]
 
-	cronjob, err = kubeclient.BatchV1().CronJobs("default").Create(context.TODO(), cronjob, metav1.CreateOptions{})
+	job, err = kubeclient.BatchV1().Jobs("default").Create(context.TODO(), job, metav1.CreateOptions{})
 	if err != nil {
 		fmt.Println(err.Error())
 		kubeclient.logger.Error("Error from K8s API when creating cronjob resource", zap.Error(err))
 		return err
 	}
-	kubeclient.logger.Info("Cronjob created", zap.String("name", cronjob.Name))
+	kubeclient.logger.Info("Cronjob created", zap.String("name", job.Name))
 
 	return nil
 }
