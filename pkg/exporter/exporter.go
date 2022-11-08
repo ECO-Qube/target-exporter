@@ -1,15 +1,19 @@
 package exporter
 
 import (
+	"context"
 	"fmt"
 	"git.helio.dev/eco-qube/target-exporter/pkg/middlewares"
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/api"
+	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"net/http"
+	"os"
 	"time"
 
 	. "git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
@@ -49,6 +53,28 @@ type TargetExporter struct {
 }
 
 func NewTargetExporter(cfg Config, kubeClient *Kubeclient, logger *zap.Logger, corsEnabled bool) *TargetExporter {
+	// Init Prometheus client
+	client, err := api.NewClient(api.Config{
+		Address: "http://localhost:9090",
+	})
+	if err != nil {
+		fmt.Printf("Error creating client: %v\n", err)
+		os.Exit(1)
+	}
+
+	v1api := v1.NewAPI(client)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	result, warnings, err := v1api.Query(ctx, "up", time.Now(), v1.WithTimeout(5*time.Second))
+	if err != nil {
+		fmt.Printf("Error querying Prometheus: %v\n", err)
+		os.Exit(1)
+	}
+	if len(warnings) > 0 {
+		fmt.Printf("Warnings: %v\n", warnings)
+	}
+	fmt.Printf("Result:\n%v\n", result)
+
 	return &TargetExporter{
 		kubeClient:  kubeClient,
 		logger:      logger,
@@ -218,6 +244,11 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 		"message": "success",
 	})
 }
+
+// GetCpuUsageTimeseries returns a timeseries of the CPU usage of each node.
+//func (t *TargetExporter) GetCpuUsageTimeseries() map[string]*Target {
+//  return t.
+//}
 
 /************* HELPER FUNCTIONS *************/
 
