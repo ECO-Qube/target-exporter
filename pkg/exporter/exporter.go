@@ -17,6 +17,7 @@ import (
 	"time"
 
 	. "git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
+	. "git.helio.dev/eco-qube/target-exporter/pkg/promclient"
 )
 
 const (
@@ -45,6 +46,7 @@ func (api *Target) GetTarget() float64 {
 type TargetExporter struct {
 	apiSrv      *http.Server
 	metricsSrv  *http.Server
+	promClient  *Promclient
 	kubeClient  *Kubeclient
 	logger      *zap.Logger
 	bootCfg     Config
@@ -52,7 +54,7 @@ type TargetExporter struct {
 	corsEnabled bool
 }
 
-func NewTargetExporter(cfg Config, kubeClient *Kubeclient, logger *zap.Logger, corsEnabled bool) *TargetExporter {
+func NewTargetExporter(cfg Config, kubeClient *Kubeclient, promClient *Promclient, logger *zap.Logger, corsEnabled bool) *TargetExporter {
 	// Init Prometheus client
 	client, err := api.NewClient(api.Config{
 		Address: "http://localhost:9090",
@@ -76,10 +78,11 @@ func NewTargetExporter(cfg Config, kubeClient *Kubeclient, logger *zap.Logger, c
 	fmt.Printf("Result:\n%v\n", result)
 
 	return &TargetExporter{
+		promClient:  promClient,
 		kubeClient:  kubeClient,
 		logger:      logger,
 		bootCfg:     cfg,
-		targets:     make(map[string]*Target),
+		targets:     make(map[string]*Target), // basic cache for the targets, source of truth is in Prometheus TSDB
 		corsEnabled: corsEnabled,
 	}
 }
