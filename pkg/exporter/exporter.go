@@ -44,14 +44,14 @@ func (api *Target) GetTarget() float64 {
 }
 
 type TargetExporter struct {
-	apiSrv      *http.Server
-	metricsSrv  *http.Server
-	promClient  *Promclient
-	kubeClient  *Kubeclient
-	logger      *zap.Logger
-	bootCfg     Config
-	targets     map[string]*Target
-	corsEnabled bool
+	apiSrv       *http.Server
+	metricsSrv   *http.Server
+	promClient   *Promclient
+	kubeClient   *Kubeclient
+	logger       *zap.Logger
+	bootCfg      Config
+	targets      map[string]*Target
+	corsDisabled bool
 }
 
 func NewTargetExporter(cfg Config, kubeClient *Kubeclient, promClient *Promclient, logger *zap.Logger, corsEnabled bool) *TargetExporter {
@@ -78,12 +78,12 @@ func NewTargetExporter(cfg Config, kubeClient *Kubeclient, promClient *Promclien
 	fmt.Printf("Result:\n%v\n", result)
 
 	return &TargetExporter{
-		promClient:  promClient,
-		kubeClient:  kubeClient,
-		logger:      logger,
-		bootCfg:     cfg,
-		targets:     make(map[string]*Target), // basic cache for the targets, source of truth is in Prometheus TSDB
-		corsEnabled: corsEnabled,
+		promClient:   promClient,
+		kubeClient:   kubeClient,
+		logger:       logger,
+		bootCfg:      cfg,
+		targets:      make(map[string]*Target), // basic cache for the targets, source of truth is in Prometheus TSDB
+		corsDisabled: corsEnabled,
 	}
 }
 
@@ -131,8 +131,8 @@ func (t *TargetExporter) StartApi() {
 	//   - stack means whether output the stack info.
 	r.Use(ginzap.RecoveryWithZap(t.logger, true))
 
-	if t.corsEnabled {
-		r.Use(middlewares.CorsEnabled)
+	if t.corsDisabled {
+		r.Use(middlewares.CorsDisabled)
 	}
 	v1 := r.Group("/api/v1")
 	{
