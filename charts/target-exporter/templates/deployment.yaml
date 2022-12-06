@@ -37,16 +37,25 @@ spec:
             - mountPath: /config.yaml
               name: config
               subPath: config.yaml
+            - mountPath: /kubeconfig
+              name: kubeconfig
           ports:
             - name: {{ .Values.service.name }}
               containerPort: {{ .Values.service.port }}
               protocol: TCP
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          args:
+            {{- range .Values.cliArgs }}
+            - {{ . -}}
+            {{ end }}
       volumes:
-        - configMap:
+        - name: config
+          configMap:
             name: config
-          name: config
+        - name: kubeconfig
+          secret:
+            secretName: kubeconfig
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

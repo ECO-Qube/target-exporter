@@ -35,7 +35,13 @@ kubectl scale deployment target-exporter --replicas=0 -n target-exporter
 kubectl scale deployment target-exporter --replicas=1 -n target-exporter 
 ```
 
-### Testing
+## Required configuration
+
+It is necessary to supply a `kubeconfig` to allow communication with the Kubernetes API. This can be done by simply 
+placing a kubeconfig in the Helm chart directory (in `charts/target-exporter`) named as `ecoqube-dev.kubeconfig`. 
+This file will be mounted in the container as a volume from a Secret created for this purpose.
+
+## Testing
 
 ### Get request to get targets
 
@@ -49,7 +55,7 @@ Successful response:
 {"targets":{"scheduling-dev-wkld-md-0-4kb8j":100000,"scheduling-dev-wkld-md-0-9tnbl":30,"scheduling-dev-wkld-md-0-l4n2t":50}}%                                                                           
 ```
 
-#### Post request to set targets
+### Post request to set targets
 
 ```bash
 curl -X POST localhost:8080/api/v1/targets \
@@ -63,14 +69,14 @@ Successful response:
 {"message":"success"}%
 ```
 
-### Notes
+## Notes
 
 - Port-forward with `kubectl port-forward -n kube-prom-stack prometheus-kube-prometheus-stack-prometheus-0 9090`
   and check under `Status > Targets` if the target was scraped successfully.
 
 https://prometheus.io/docs/instrumenting/writing_exporters/#target-labels-not-static-scraped-labels
 
-### TODOs
+## TODOs
 
 - [x] Prometheus doesn't have permission to scrape resources in namespaces different from its own (kube-prom-stack). It
   would be better to place target-exporter into its own namespace and give Prometheus permission to scrape it.

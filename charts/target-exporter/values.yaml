@@ -8,7 +8,7 @@ image:
   repository: docker.io/cristianohelio/target-exporter
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "0.0.4"
+  tag: "0.0.5"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -70,9 +70,11 @@ affinity: {}
 scrapeLabel:
   release: "prometheus"
 
+cliArgs: ["--cors-disabled=true", "--kubeconfig=/kubeconfig/ecoqube-dev.kubeconfig"]
+
 config:
   targetMetricName: "fake_energy_target"
   targets:
-    scheduling-dev-wkld-md-0-4kb8j: 15000
-    scheduling-dev-wkld-md-0-9tnbl: 20000
-    scheduling-dev-wkld-md-0-l4n2t: 30000
+    ecoqube-dev-default-worker-topo-vwhzd-97cf45665-m6mqz: 20
+    ecoqube-dev-default-worker-topo-vwhzd-97cf45665-psmc7: 30
+    ecoqube-dev-default-worker-topo-vwhzd-97cf45665-wtksh: 50
