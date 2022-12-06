@@ -66,11 +66,10 @@ tolerations: []
 
 affinity: {}
 
-# Label used by Prometheus to scrape a service. Should be the same as in the Prometheus configuration.
-scrapeLabel:
-  release: "prometheus"
-
-cliArgs: ["--cors-disabled=true", "--kubeconfig=/kubeconfig/ecoqube-dev.kubeconfig"]
+# CLI args for target-exporter
+cliArgs: ["--cors-disabled=true",
+          "--kubeconfig=/kubeconfig/ecoqube-dev.kubeconfig",
+          "--promclient-address=http://prom-service.monitoring.svc.cluster.local:9090"]
 
 config:
   targetMetricName: "fake_energy_target"

@@ -120,7 +120,7 @@ func init() {
 	initKubeClient()
 	initPromClient()
 
-	api = NewTargetExporter(cfg, kubeclient, promclient, logger, isCorsDisabled)
+	api = NewTargetExporter(cfg, kubeclient, promclient, promclientAddress, logger, isCorsDisabled)
 }
 
 func main() {

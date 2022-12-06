@@ -54,10 +54,11 @@ type TargetExporter struct {
 	corsDisabled bool
 }
 
-func NewTargetExporter(cfg Config, kubeClient *Kubeclient, promClient *Promclient, logger *zap.Logger, corsEnabled bool) *TargetExporter {
+func NewTargetExporter(cfg Config, kubeClient *Kubeclient, promClient *Promclient, promClientAddress string, logger *zap.Logger, corsEnabled bool) *TargetExporter {
 	// Init Prometheus client
 	client, err := api.NewClient(api.Config{
-		Address: "http://localhost:9090",
+		// TODO: How to get address from v1.API embedded in Promclient instead of passing an additional parameter?
+		Address: promClientAddress,
 	})
 	if err != nil {
 		fmt.Printf("Error creating client: %v\n", err)
