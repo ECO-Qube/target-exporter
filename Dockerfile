@@ -7,11 +7,10 @@ FROM golang:1.18-buster AS build
 
 WORKDIR /app
 
-COPY go.mod ./
-COPY go.sum ./
-RUN go mod download
+COPY . .
 
-COPY *.go ./
+RUN go mod download
+RUN go mod vendor
 
 RUN go build -o /target-exporter
 

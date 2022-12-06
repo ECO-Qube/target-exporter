@@ -1,5 +1,5 @@
 targetMetricName: "fake_energy_target"
 targets:
-  scheduling-dev-wkld-md-0-4kb8j: 20
-  scheduling-dev-wkld-md-0-9tnbl: 30
-  scheduling-dev-wkld-md-0-l4n2t: 50
+  ecoqube-dev-default-worker-topo-vwhzd-97cf45665-m6mqz: 20
+  ecoqube-dev-default-worker-topo-vwhzd-97cf45665-psmc7: 30
+  ecoqube-dev-default-worker-topo-vwhzd-97cf45665-wtksh: 50
