@@ -142,6 +142,8 @@ func (t *TargetExporter) StartApi() {
 
 		v1.GET("/workloads", t.getWorkloads)
 		v1.POST("/workloads", t.postWorkloads)
+
+		v1.GET("/actualNodeCpuUsage", t.getCpuUsagePerNode)
 	}
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -249,10 +251,22 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 	})
 }
 
-// GetCpuUsageTimeseries returns a timeseries of the CPU usage of each node.
-//func (t *TargetExporter) GetCpuUsageTimeseries() map[string]*Target {
-//  return t.
-//}
+type CpuUsage struct {
+	NodeName string  `json:"nodeName"`
+	Usage    float64 `json:"usage"`
+}
+
+// GetCurrentCpuUsagePerNode returns a timeseries of the CPU usage of each node.
+func (t *TargetExporter) getCpuUsagePerNode(g *gin.Context) {
+
+	t.promClient.GetCurrentCpuUsagePerNode()
+
+	//var payload []CpuUsage
+	//
+	//payload := CpuUsage{NodeName: usages.name}
+	//
+	//g.JSON(http.StatusOK)
+}
 
 /************* HELPER FUNCTIONS *************/
 
