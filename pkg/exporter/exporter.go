@@ -251,21 +251,16 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 	})
 }
 
-type CpuUsage struct {
-	NodeName string  `json:"nodeName"`
-	Usage    float64 `json:"usage"`
-}
-
 // GetCurrentCpuUsagePerNode returns a timeseries of the CPU usage of each node.
 func (t *TargetExporter) getCpuUsagePerNode(g *gin.Context) {
 
-	t.promClient.GetCurrentCpuUsagePerNode()
+	cpuUsagesPerNode, err := t.promClient.GetCurrentCpuUsagePerNode()
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
-	//var payload []CpuUsage
-	//
-	//payload := CpuUsage{NodeName: usages.name}
-	//
-	//g.JSON(http.StatusOK)
+	g.JSON(http.StatusOK, cpuUsagesPerNode)
 }
 
 /************* HELPER FUNCTIONS *************/

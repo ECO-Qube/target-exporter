@@ -20,8 +20,9 @@ type Promclient struct {
 }
 
 type NodeCpuUsage struct {
-	timestamp time.Time
-	usage     float64 // CPU usage in percentage 0-100
+	NodeName  string    `json:"nodeName"`
+	Timestamp time.Time `json:"timestamp"`
+	Usage     float64   `json:"usage"` // CPU Usage in percentage 0-100
 }
 
 func NewPromClient(client v1.API, logger *zap.Logger) *Promclient {
@@ -48,7 +49,6 @@ func (p *Promclient) GetCurrentCpuUsagePerNode() ([]NodeCpuUsage, error) {
 	cpuUsagesPerNode := make([]NodeCpuUsage, 0)
 
 	for _, entry := range result.(model.Matrix) {
-		fmt.Println(model.LabelSet(entry.Metric)["instance"])
 		// Assume there is only one value per each node (hence Values[0])
 		// Drop "fraction of second" from timestamp
 		currentValue := entry.Values[0]
@@ -57,10 +57,16 @@ func (p *Promclient) GetCurrentCpuUsagePerNode() ([]NodeCpuUsage, error) {
 			return nil, err
 		}
 		usage, err := strconv.ParseFloat(currentValue.Value.String(), 64)
+		if err != nil {
+			return nil, err
+		}
 		cpuUsagesPerNode = append(cpuUsagesPerNode, NodeCpuUsage{
-			timestamp: time.Unix(ts, 0),
-			usage:     usage,
+			NodeName:  string(model.LabelSet(entry.Metric)["instance"]),
+			Timestamp: time.Unix(ts, 0),
+			Usage:     usage,
 		})
+
+		fmt.Println(cpuUsagesPerNode)
 	}
 
 	return cpuUsagesPerNode, nil
