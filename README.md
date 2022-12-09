@@ -69,6 +69,89 @@ Successful response:
 {"message":"success"}%
 ```
 
+### Get actual CPU usage per each node in range 
+
+- Results is in steps of 1 second, e.g. from 12:00:30 to 12:00:40 gives 10 measurements, last second not inclusive.
+- Dates are expressed in RFC3339 ISO format.
+
+```bash
+curl -X GET 'localhost:8080/api/v1/actualCpuUsageByRangeSeconds?start=2022-12-09T12:01:24.429Z&end=2022-12-09T12:01:34.429Z'
+```
+
+<details open>
+<summary>Successful response:</summary>
+<br>
+```json
+[{
+	"nodeName": "ecoqube-dev-default-worker-topo-lx7l2-65d7746-bg5rp",
+	"usage": [{
+		"timestamp": "2022-12-09T13:01:24+01:00",
+		"data": 5.688636363636107
+	}, {
+		"timestamp": "2022-12-09T13:01:25+01:00",
+		"data": 5.688636363636107
+	}, {
+		"timestamp": "2022-12-09T13:01:26+01:00",
+		"data": 5.688636363636107
+	}, {
+		"timestamp": "2022-12-09T13:01:27+01:00",
+		"data": 5.688636363636107
+	}, {
+		"timestamp": "2022-12-09T13:01:28+01:00",
+		"data": 5.482575757575816
+	}, {
+		"timestamp": "2022-12-09T13:01:29+01:00",
+		"data": 5.482575757575816
+	}, {
+		"timestamp": "2022-12-09T13:01:30+01:00",
+		"data": 5.482575757575816
+	}, {
+		"timestamp": "2022-12-09T13:01:31+01:00",
+		"data": 5.482575757575816
+	}, {
+		"timestamp": "2022-12-09T13:01:32+01:00",
+		"data": 5.482575757575816
+	}, {
+		"timestamp": "2022-12-09T13:01:33+01:00",
+		"data": 5.409090909091034
+	}]
+}, {
+	"nodeName": "ecoqube-dev-default-worker-topo-lx7l2-65d7746-j7npf",
+	"usage": [{
+		"timestamp": "2022-12-09T13:01:24+01:00",
+		"data": 5.743181818181924
+	}, {
+		"timestamp": "2022-12-09T13:01:25+01:00",
+		"data": 5.743181818181924
+	}, {
+		"timestamp": "2022-12-09T13:01:26+01:00",
+		"data": 5.743181818181924
+	}, {
+		"timestamp": "2022-12-09T13:01:27+01:00",
+		"data": 5.41136363636339
+	}, {
+		"timestamp": "2022-12-09T13:01:28+01:00",
+		"data": 5.41136363636339
+	}, {
+		"timestamp": "2022-12-09T13:01:29+01:00",
+		"data": 5.41136363636339
+	}, {
+		"timestamp": "2022-12-09T13:01:30+01:00",
+		"data": 5.41136363636339
+	}, {
+		"timestamp": "2022-12-09T13:01:31+01:00",
+		"data": 5.41136363636339
+	}, {
+		"timestamp": "2022-12-09T13:01:32+01:00",
+		"data": 5.421212121212108
+	}, {
+		"timestamp": "2022-12-09T13:01:33+01:00",
+		"data": 5.421212121212108
+	}]
+}]
+```
+</details>
+
 ## Notes
 
 - Port-forward with `kubectl port-forward -n kube-prom-stack prometheus-kube-prometheus-stack-prometheus-0 9090`

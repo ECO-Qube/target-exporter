@@ -143,7 +143,7 @@ func (t *TargetExporter) StartApi() {
 		v1.GET("/workloads", t.getWorkloads)
 		v1.POST("/workloads", t.postWorkloads)
 
-		v1.GET("/actualNodeCpuUsage", t.getCpuUsagePerNode)
+		v1.GET("/actualCpuUsageByRangeSeconds", t.getCpuUsageByRangeSeconds)
 	}
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -251,10 +251,20 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 	})
 }
 
-// GetCurrentCpuUsagePerNode returns a timeseries of the CPU usage of each node.
-func (t *TargetExporter) getCpuUsagePerNode(g *gin.Context) {
-
-	cpuUsagesPerNode, err := t.promClient.GetCurrentCpuUsagePerNode()
+// GetCpuUsageByRangeSeconds returns a timeseries of the CPU usage of each node.
+func (t *TargetExporter) getCpuUsageByRangeSeconds(g *gin.Context) {
+	// Parse ISO date start and end from HTTP get request using Gin framework
+	start, err := time.Parse(time.RFC3339, g.Query("start"))
+	if err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	end, err := time.Parse(time.RFC3339, g.Query("end"))
+	if err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	cpuUsagesPerNode, err := t.promClient.GetCpuUsageByRangeSeconds(start, end)
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
