@@ -157,3 +157,11 @@ func (kubeclient *Kubeclient) SpawnNewWorkload() error {
 
 	return nil
 }
+
+func (kubeclient *Kubeclient) IsNodeNameValid(name string) bool {
+	_, err := kubeclient.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return false
+	}
+	return true
+}

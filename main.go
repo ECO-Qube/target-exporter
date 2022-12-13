@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -113,12 +114,29 @@ func initPromClient() {
 	promclient = NewPromClient(promv1, logger)
 }
 
+// checkConfig checks if the config is valid, in particular it makes sure that the node names specified in the
+// config are valid node names in the cluster
+func checkConfig() {
+	invalidNames := make([]string, 0)
+	for k, _ := range cfg.Targets {
+		if !kubeclient.IsNodeNameValid(k) {
+			invalidNames = append(invalidNames, k)
+		}
+	}
+	if len(invalidNames) > 0 {
+		logger.Fatal(fmt.Sprintf("The following node names are not valid: %s. Are they reachable from target-exporter?",
+			strings.Join(invalidNames, ", ")))
+	}
+}
+
 func init() {
 	initFlags()
 	initLogger()
 	initCfgFile()
 	initKubeClient()
 	initPromClient()
+
+	checkConfig()
 
 	api = NewTargetExporter(cfg, kubeclient, promclient, promclientAddress, logger, isCorsDisabled)
 }
