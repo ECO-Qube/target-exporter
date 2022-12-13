@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 	v1batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
@@ -161,6 +162,11 @@ func (kubeclient *Kubeclient) SpawnNewWorkload() error {
 func (kubeclient *Kubeclient) IsNodeNameValid(name string) bool {
 	_, err := kubeclient.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
+		kubeclient.logger.Error("Error getting node", zap.Error(err))
+		return false
+	}
+	if errors.IsNotFound(err) {
+		kubeclient.logger.Error("Node not found", zap.Error(err))
 		return false
 	}
 	return true
