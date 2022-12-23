@@ -142,6 +142,8 @@ func (t *TargetExporter) StartApi() {
 
 		v1.GET("/workloads", t.getWorkloads)
 		v1.POST("/workloads", t.postWorkloads)
+		v1.DELETE("/workloads/completed", t.deleteWorkloadsCompleted)
+		v1.DELETE("/workloads/pending/last", t.deleteWorkloadsPendingLast)
 
 		v1.GET("/actualCpuUsageByRangeSeconds", t.getCpuUsageByRangeSeconds)
 	}
@@ -206,6 +208,22 @@ func (t *TargetExporter) postTargetsRequest(g *gin.Context) {
 	g.JSON(http.StatusOK, gin.H{
 		"message": "success",
 	})
+}
+
+func (t *TargetExporter) deleteWorkloadsCompleted(g *gin.Context) {
+	err := t.kubeClient.ClearCompletedWorkloads()
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+}
+
+func (t *TargetExporter) deleteWorkloadsPendingLast(g *gin.Context) {
+	err := t.kubeClient.DeletePendingWorkload()
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 }
 
 type Workload struct {

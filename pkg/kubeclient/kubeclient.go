@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
+	"sort"
 	"strings"
 	//
 	// Uncomment to load all auth plugins
@@ -79,6 +80,15 @@ spec:
       labels:
         app: 25-cpu-stresstest-cron
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: cpu-diff-policy
+                    operator: In
+                    values:
+                      - violating
       containers:
         - name: 25-cpu-stresstest-cron
           image: petarmaric/docker.cpu-stress-test
@@ -97,22 +107,25 @@ spec:
   backoffLimit: 4
 `
 
+var policy = metav1.DeletePropagationForeground
+
 type Kubeclient struct {
 	*kubernetes.Clientset
 
 	logger *zap.Logger
+	ns     string
 }
 
 func NewKubeClient(client *kubernetes.Clientset, logger *zap.Logger) *Kubeclient {
-	return &Kubeclient{client, logger}
+	return &Kubeclient{client, logger, "default"}
 }
 
 // https://github.com/kubernetes/client-go/blob/master/examples/out-of-cluster-client-configuration/main.go
-func (kubeclient *Kubeclient) GetPodsInNamespace() (*v1.PodList, error) {
+func (kc *Kubeclient) GetPodsInNamespace() (*v1.PodList, error) {
 	// TODO: Make namespace configurable or get via label selection
-	pods, err := kubeclient.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
+	pods, err := kc.CoreV1().Pods(kc.ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		kubeclient.logger.Error("Error getting pods", zap.Error(err))
+		kc.logger.Error("Error getting pods", zap.Error(err))
 		return nil, err
 	}
 	return pods, nil
@@ -120,7 +133,7 @@ func (kubeclient *Kubeclient) GetPodsInNamespace() (*v1.PodList, error) {
 	// Examples for error handling:
 	// - Use helper functions like e.g. errors.IsNotFound()
 	// - And/or cast to StatusError and use its properties like e.g. ErrStatus.Message
-	//namespace := "default"
+	//namespace := kc.ns
 	//pod := "example-xxxxx"
 	//_, err = clientset.CoreV1().Pods(namespace).Get(context.TODO(), pod, metav1.GetOptions{})
 	//if errors.IsNotFound(err) {
@@ -136,38 +149,130 @@ func (kubeclient *Kubeclient) GetPodsInNamespace() (*v1.PodList, error) {
 }
 
 // SpawnNewWorkload creates a new stress test workload
-func (kubeclient *Kubeclient) SpawnNewWorkload() error {
+func (kc *Kubeclient) SpawnNewWorkload() error {
 	// TODO: Parametrize...
 	var job *v1batch.Job
 	err := yaml.NewYAMLOrJSONDecoder(strings.NewReader(stressTestJob25), len(stressTestJob25)).Decode(&job)
 	if err != nil {
-		kubeclient.logger.Error("Error decoding yaml", zap.Error(err))
+		kc.logger.Error("Error decoding yaml", zap.Error(err))
 		return err
 	}
-	kubeclient.logger.Info("Spawning cronjob", zap.String("name", job.Name))
+	kc.logger.Info("Spawning cronjob", zap.String("name", job.Name))
 
 	job.Name = job.Name + "-" + uuid.New().String()[0:8]
 
-	job, err = kubeclient.BatchV1().Jobs("default").Create(context.TODO(), job, metav1.CreateOptions{})
+	job, err = kc.BatchV1().Jobs(kc.ns).Create(context.TODO(), job, metav1.CreateOptions{})
 	if err != nil {
 		fmt.Println(err.Error())
-		kubeclient.logger.Error("Error from K8s API when creating cronjob resource", zap.Error(err))
+		kc.logger.Error("Error from K8s API when creating cronjob resource", zap.Error(err))
 		return err
 	}
-	kubeclient.logger.Info("Cronjob created", zap.String("name", job.Name))
+	kc.logger.Info("Cronjob created", zap.String("name", job.Name))
 
 	return nil
 }
 
-func (kubeclient *Kubeclient) IsNodeNameValid(name string) bool {
-	_, err := kubeclient.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+func (kc *Kubeclient) ClearCompletedWorkloads() (int error) {
+	kc.logger.Info("Clearing completed workloads")
+	jobs, err := kc.BatchV1().Jobs(kc.ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		kubeclient.logger.Error("Error getting node", zap.Error(err))
+		kc.logger.Error("Error getting Jobs", zap.Error(err))
+		return err
+	}
+	for _, job := range jobs.Items {
+		if job.Status.Active == 0 && job.Status.Succeeded > 0 {
+			kc.logger.Info("Deleting completed Job", zap.String("name", job.Name))
+			err = kc.BatchV1().Jobs(kc.ns).Delete(context.TODO(), job.Name, metav1.DeleteOptions{})
+			if err != nil {
+				kc.logger.Error("Error deleting Job", zap.Error(err))
+				return err
+			}
+		}
+	}
+	pods, err := kc.CoreV1().Pods(kc.ns).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		kc.logger.Error("Error getting jobs", zap.Error(err))
+		return err
+	}
+	for _, pod := range pods.Items {
+		if pod.Status.Phase == v1.PodSucceeded {
+			kc.logger.Info("Deleting completed Pod", zap.String("name", pod.Name))
+			err = kc.CoreV1().Pods(kc.ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+			if err != nil {
+				kc.logger.Error("Error deleting job", zap.Error(err))
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (kc *Kubeclient) DeletePendingWorkload() error {
+	kc.logger.Info("Delete pending workload")
+	jobs, err := kc.BatchV1().Jobs(kc.ns).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		kc.logger.Error("Error getting Jobs", zap.Error(err))
+		return err
+	}
+	// Set aside Jobs with active pods
+	var candidateJobs []v1batch.Job
+	for _, job := range jobs.Items {
+		if job.Status.Succeeded == 0 {
+			candidateJobs = append(candidateJobs, job)
+		}
+	}
+
+	if len(candidateJobs) == 0 {
+		return nil
+	}
+
+	// Sort candidate Jobs by creation time
+	sort.Slice(candidateJobs, func(i, j int) bool {
+		return candidateJobs[i].CreationTimestamp.Before(&candidateJobs[j].CreationTimestamp)
+	})
+
+	pods, err := kc.CoreV1().Pods(kc.ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase=Pending"})
+	if err != nil {
+		kc.logger.Error("Error getting Pods", zap.Error(err))
+		return err
+	}
+	// Get the oldest Job and all Pending Pods, if Pod has owner a candidate Job, delete it and return, else go to next oldest Job and repeat
+	for _, candidateJob := range candidateJobs {
+		for _, pod := range pods.Items {
+			if isOwnerPresent(pod.OwnerReferences, candidateJob.Name, "Job") {
+				kc.logger.Info("Deleting Job with pending Pods", zap.String("name", candidateJob.Name))
+				err = kc.BatchV1().Jobs(kc.ns).Delete(context.TODO(), candidateJob.Name, metav1.DeleteOptions{
+					PropagationPolicy: &policy,
+				})
+				if err != nil {
+					kc.logger.Error("Error deleting Job", zap.Error(err))
+					return err
+				}
+				return nil
+			}
+		}
+	}
+	return nil
+}
+
+func (kc *Kubeclient) IsNodeNameValid(name string) bool {
+	_, err := kc.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		kc.logger.Error("Error getting node", zap.Error(err))
 		return false
 	}
 	if errors.IsNotFound(err) {
-		kubeclient.logger.Error("Node not found", zap.Error(err))
+		kc.logger.Error("Node not found", zap.Error(err))
 		return false
 	}
 	return true
+}
+
+func isOwnerPresent(ownerRefs []metav1.OwnerReference, ownerName string, kind string) bool {
+	for _, ownerRef := range ownerRefs {
+		if ownerRef.Name == ownerName && ownerRef.Kind == kind {
+			return true
+		}
+	}
+	return false
 }
