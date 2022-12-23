@@ -86,7 +86,7 @@ spec:
             nodeSelectorTerms:
               - matchExpressions:
                   - key: cpu-diff-policy
-                    operator: In
+                    operator: NotIn
                     values:
                       - violating
       containers:
@@ -172,12 +172,12 @@ func (kc *Kubeclient) SpawnNewWorkload() error {
 	return nil
 }
 
-func (kc *Kubeclient) ClearCompletedWorkloads() (int error) {
+func (kc *Kubeclient) ClearCompletedWorkloads() (done bool, err error) {
 	kc.logger.Info("Clearing completed workloads")
 	jobs, err := kc.BatchV1().Jobs(kc.ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		kc.logger.Error("Error getting Jobs", zap.Error(err))
-		return err
+		return false, err
 	}
 	for _, job := range jobs.Items {
 		if job.Status.Active == 0 && job.Status.Succeeded > 0 {
@@ -185,14 +185,14 @@ func (kc *Kubeclient) ClearCompletedWorkloads() (int error) {
 			err = kc.BatchV1().Jobs(kc.ns).Delete(context.TODO(), job.Name, metav1.DeleteOptions{})
 			if err != nil {
 				kc.logger.Error("Error deleting Job", zap.Error(err))
-				return err
+				return false, err
 			}
 		}
 	}
 	pods, err := kc.CoreV1().Pods(kc.ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		kc.logger.Error("Error getting jobs", zap.Error(err))
-		return err
+		return false, err
 	}
 	for _, pod := range pods.Items {
 		if pod.Status.Phase == v1.PodSucceeded {
@@ -200,19 +200,21 @@ func (kc *Kubeclient) ClearCompletedWorkloads() (int error) {
 			err = kc.CoreV1().Pods(kc.ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 			if err != nil {
 				kc.logger.Error("Error deleting job", zap.Error(err))
-				return err
+				return false, err
+			} else {
+				done = true
 			}
 		}
 	}
-	return nil
+	return done, nil
 }
 
-func (kc *Kubeclient) DeletePendingWorkload() error {
+func (kc *Kubeclient) DeletePendingWorkload() (done bool, err error) {
 	kc.logger.Info("Delete pending workload")
 	jobs, err := kc.BatchV1().Jobs(kc.ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		kc.logger.Error("Error getting Jobs", zap.Error(err))
-		return err
+		return false, err
 	}
 	// Set aside Jobs with active pods
 	var candidateJobs []v1batch.Job
@@ -223,7 +225,7 @@ func (kc *Kubeclient) DeletePendingWorkload() error {
 	}
 
 	if len(candidateJobs) == 0 {
-		return nil
+		return false, nil
 	}
 
 	// Sort candidate Jobs by creation time
@@ -234,7 +236,7 @@ func (kc *Kubeclient) DeletePendingWorkload() error {
 	pods, err := kc.CoreV1().Pods(kc.ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase=Pending"})
 	if err != nil {
 		kc.logger.Error("Error getting Pods", zap.Error(err))
-		return err
+		return false, err
 	}
 	// Get the oldest Job and all Pending Pods, if Pod has owner a candidate Job, delete it and return, else go to next oldest Job and repeat
 	for _, candidateJob := range candidateJobs {
@@ -246,13 +248,13 @@ func (kc *Kubeclient) DeletePendingWorkload() error {
 				})
 				if err != nil {
 					kc.logger.Error("Error deleting Job", zap.Error(err))
-					return err
+					return false, err
 				}
-				return nil
+				return true, nil
 			}
 		}
 	}
-	return nil
+	return false, nil
 }
 
 func (kc *Kubeclient) IsNodeNameValid(name string) bool {
