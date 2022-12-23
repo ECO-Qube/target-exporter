@@ -157,7 +157,7 @@ func (kc *Kubeclient) SpawnNewWorkload() error {
 		kc.logger.Error("Error decoding yaml", zap.Error(err))
 		return err
 	}
-	kc.logger.Info("Spawning cronjob", zap.String("name", job.Name))
+	kc.logger.Info("Spawning Job", zap.String("name", job.Name))
 
 	job.Name = job.Name + "-" + uuid.New().String()[0:8]
 
@@ -167,7 +167,7 @@ func (kc *Kubeclient) SpawnNewWorkload() error {
 		kc.logger.Error("Error from K8s API when creating cronjob resource", zap.Error(err))
 		return err
 	}
-	kc.logger.Info("Cronjob created", zap.String("name", job.Name))
+	kc.logger.Info("Job created", zap.String("name", job.Name))
 
 	return nil
 }
