@@ -3,16 +3,14 @@ package kubeclient
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 	v1batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 	"sort"
-	"strings"
+	"time"
 	//
 	// Uncomment to load all auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -22,90 +20,6 @@ import (
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
-
-// TODO: Deploy exporter in TAS-enabled cluster
-//const stressTestJob25 = `
-//apiVersion: batch/v1
-//kind: CronJob
-//metadata:
-//  name: 25-cpu-stresstest-cron
-//spec:
-//  schedule: "*/1 * * * *" # every minute
-//  jobTemplate:
-//    spec:
-//      template:
-//        metadata:
-//          labels:
-//            app: 25-cpu-stresstest-cron
-//            telemetry-policy: cpu-diff-policy
-//        spec:
-//          affinity:
-//            nodeAffinity:
-//              requiredDuringSchedulingIgnoredDuringExecution:
-//                nodeSelectorTerms:
-//                  - matchExpressions:
-//                      - key: cpu-diff-policy
-//                        operator: NotIn
-//                        values:
-//                          - violating
-//          containers:
-//          - name: 25-cpu-stresstest-cron
-//            image: petarmaric/docker.cpu-stress-test
-//            imagePullPolicy: IfNotPresent
-//            env:
-//              - name: MAX_CPU_CORES
-//                value: "2"
-//              - name: STRESS_SYSTEM_FOR
-//                value: "5m"
-//            resources:
-//              requests:
-//                cpu: "250m"
-//              limits:
-//                cpu: "250m"
-//                telemetry/scheduling: "1"
-//          restartPolicy: Never
-//      parallelism: 1
-//      completions: 1
-//`
-
-const stressTestJob25 = `
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: 25-cpu-stresstest-cron
-  namespace: default
-spec:
-  template:
-    metadata:
-      labels:
-        app: 25-cpu-stresstest-cron
-    spec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: cpu-diff-policy
-                    operator: NotIn
-                    values:
-                      - violating
-      containers:
-        - name: 25-cpu-stresstest-cron
-          image: petarmaric/docker.cpu-stress-test
-          imagePullPolicy: IfNotPresent
-          env:
-            - name: MAX_CPU_CORES
-              value: '1'
-            - name: STRESS_SYSTEM_FOR
-              value: 1m
-          resources:
-            requests:
-              cpu: 250m
-            limits:
-              cpu: 250m
-      restartPolicy: Never
-  backoffLimit: 4
-`
 
 var policy = metav1.DeletePropagationForeground
 
@@ -120,8 +34,8 @@ func NewKubeClient(client *kubernetes.Clientset, logger *zap.Logger) *Kubeclient
 	return &Kubeclient{client, logger, "default"}
 }
 
-// https://github.com/kubernetes/client-go/blob/master/examples/out-of-cluster-client-configuration/main.go
 func (kc *Kubeclient) GetPodsInNamespace() (*v1.PodList, error) {
+	// https://github.com/kubernetes/client-go/blob/master/examples/out-of-cluster-client-configuration/main.go
 	// TODO: Make namespace configurable or get via label selection
 	pods, err := kc.CoreV1().Pods(kc.ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -129,45 +43,25 @@ func (kc *Kubeclient) GetPodsInNamespace() (*v1.PodList, error) {
 		return nil, err
 	}
 	return pods, nil
-
-	// Examples for error handling:
-	// - Use helper functions like e.g. errors.IsNotFound()
-	// - And/or cast to StatusError and use its properties like e.g. ErrStatus.Message
-	//namespace := kc.ns
-	//pod := "example-xxxxx"
-	//_, err = clientset.CoreV1().Pods(namespace).Get(context.TODO(), pod, metav1.GetOptions{})
-	//if errors.IsNotFound(err) {
-	//	fmt.Printf("Pod %s in namespace %s not found\n", pod, namespace)
-	//} else if statusError, isStatus := err.(*errors.StatusError); isStatus {
-	//	fmt.Printf("Error getting pod %s in namespace %s: %v\n",
-	//		pod, namespace, statusError.ErrStatus.Message)
-	//} else if err != nil {
-	//	panic(err.Error())
-	//} else {
-	//	fmt.Printf("Found pod %s in namespace %s\n", pod, namespace)
-	//}
 }
 
 // SpawnNewWorkload creates a new stress test workload
-func (kc *Kubeclient) SpawnNewWorkload() error {
-	// TODO: Parametrize...
-	var job *v1batch.Job
-	err := yaml.NewYAMLOrJSONDecoder(strings.NewReader(stressTestJob25), len(stressTestJob25)).Decode(&job)
+func (kc *Kubeclient) SpawnNewWorkload(jobCpuLimit int, cpuCount int, jobLength time.Duration) error {
+	job := NewStressJob(jobCpuLimit, cpuCount, jobLength)
+	k8sJob, err := job.GetK8sJob()
 	if err != nil {
-		kc.logger.Error("Error decoding yaml", zap.Error(err))
+		kc.logger.Error("Error getting K8s Job", zap.Error(err))
 		return err
 	}
 	kc.logger.Info("Spawning Job", zap.String("name", job.Name))
 
-	job.Name = job.Name + "-" + uuid.New().String()[0:8]
-
-	job, err = kc.BatchV1().Jobs(kc.ns).Create(context.TODO(), job, metav1.CreateOptions{})
+	resultingJob, err := kc.BatchV1().Jobs(kc.ns).Create(context.TODO(), k8sJob, metav1.CreateOptions{})
 	if err != nil {
 		fmt.Println(err.Error())
-		kc.logger.Error("Error from K8s API when creating cronjob resource", zap.Error(err))
+		kc.logger.Error("Error from K8s API when creating Job resource", zap.Error(err))
 		return err
 	}
-	kc.logger.Info("Job created", zap.String("name", job.Name))
+	kc.logger.Info("Job created successfully", zap.String("name", resultingJob.Name))
 
 	return nil
 }
