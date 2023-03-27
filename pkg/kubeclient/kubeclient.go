@@ -46,8 +46,8 @@ func (kc *Kubeclient) GetPodsInNamespace() (*v1.PodList, error) {
 }
 
 // SpawnNewWorkload creates a new stress test workload
-func (kc *Kubeclient) SpawnNewWorkload(jobCpuLimit int, cpuCount int, jobLength time.Duration) error {
-	job := NewStressJob(jobCpuLimit, cpuCount, jobLength)
+func (kc *Kubeclient) SpawnNewWorkload(jobCpuLimit int, cpuCount int, jobLength time.Duration, workloadType WorkloadType) error {
+	job := NewStressJob(jobCpuLimit, cpuCount, jobLength, workloadType)
 	k8sJob, err := job.GetK8sJob()
 	if err != nil {
 		kc.logger.Error("Error getting K8s Job", zap.Error(err))

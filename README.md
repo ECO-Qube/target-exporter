@@ -69,7 +69,18 @@ Successful response:
 {"message":"success"}%
 ```
 
-### Get actual CPU usage per each node in range 
+### Post request to spawn workload
+
+Note that the nodes must contain the relative workload type label, e.g. `ecoqube.eu/workload-type: storage`.
+
+```bash
+curl -X POST localhost:8080/api/v1/workloads \
+-H 'Content-Type: application/json' \
+-d '{"jobLength": , "cpuTarget": cpuTarget, "workloadType": "storage"}'
+```
+```
+
+
 
 - Results is in steps of 1 second, e.g. from 12:00:30 to 12:00:40 gives 10 measurements, last second not inclusive.
 - Dates are expressed in RFC3339 ISO format.

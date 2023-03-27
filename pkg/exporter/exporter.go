@@ -274,8 +274,9 @@ func (t *TargetExporter) getWorkloads(g *gin.Context) {
 }
 
 type WorkloadRequest struct {
-	CpuTarget int `json:"cpuTarget"`
-	JobLength int `json:"jobLength"`
+	CpuTarget    int          `json:"cpuTarget"`
+	JobLength    int          `json:"jobLength"`
+	WorkloadType WorkloadType `json:"workloadType"`
 }
 
 func (t *TargetExporter) postWorkloads(g *gin.Context) {
@@ -285,7 +286,7 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 		return
 	}
 	// TODO: Configurable CPU count
-	err := t.kubeClient.SpawnNewWorkload(payload.CpuTarget, 1, time.Duration(payload.JobLength*int(time.Minute)))
+	err := t.kubeClient.SpawnNewWorkload(payload.CpuTarget, 7, time.Duration(payload.JobLength*int(time.Minute)), payload.WorkloadType)
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
