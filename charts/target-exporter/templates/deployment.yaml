@@ -43,6 +43,9 @@ spec:
             - name: {{ .Values.service.name }}
               containerPort: {{ .Values.service.port }}
               protocol: TCP
+            - name: backend
+              containerPort: 8080
+              protocol: TCP
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           args:

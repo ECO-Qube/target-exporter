@@ -11,5 +11,9 @@ spec:
       targetPort: {{ .Values.service.port }}
       protocol: TCP
       name: {{ .Values.service.name }}
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: backend
   selector:
     {{- include "target-exporter.selectorLabels" . | nindent 4 }}
