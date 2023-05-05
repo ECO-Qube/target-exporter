@@ -1,5 +1,5 @@
 targetMetricName: "fake_energy_target"
 targets:
-  ecoqube-dev-default-worker-topo-plnt7-5cbc848c9b-8rw2p: 20
-  ecoqube-dev-default-worker-topo-plnt7-5cbc848c9b-dbt9p: 30
-  ecoqube-dev-default-worker-topo-plnt7-5cbc848c9b-r52sw: 50
+  ecoqube-dev-default-worker-topo-b5kqx-56588d7df7xxcb68-jl6st: 20
+  ecoqube-dev-default-worker-topo-b5kqx-56588d7df7xxcb68-lq2xn: 30
+  ecoqube-dev-default-worker-topo-b5kqx-56588d7df7xxcb68-v6vqr: 50
