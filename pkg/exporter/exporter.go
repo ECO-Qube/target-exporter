@@ -52,6 +52,7 @@ type TargetExporter struct {
 	logger       *zap.Logger
 	bootCfg      Config
 	targets      map[string]*Target
+	schedSet     map[string]bool
 	corsDisabled bool
 }
 
