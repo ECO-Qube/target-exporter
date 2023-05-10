@@ -10,7 +10,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"sort"
-	"time"
 	//
 	// Uncomment to load all auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -46,14 +45,13 @@ func (kc *Kubeclient) GetPodsInNamespace() (*v1.PodList, error) {
 }
 
 // SpawnNewWorkload creates a new stress test workload
-func (kc *Kubeclient) SpawnNewWorkload(jobCpuLimit int, cpuCount int, jobLength time.Duration, workloadType WorkloadType) error {
-	job := NewStressJob(jobCpuLimit, cpuCount, jobLength, workloadType)
-	k8sJob, err := job.GetK8sJob()
+func (kc *Kubeclient) SpawnNewWorkload(job *StressJob) error {
+	k8sJob, err := job.RenderK8sJob()
 	if err != nil {
 		kc.logger.Error("Error getting K8s Job", zap.Error(err))
 		return err
 	}
-	kc.logger.Info("Spawning Job", zap.String("name", job.Name))
+	kc.logger.Info("Spawning Job", zap.String("name", job.name))
 
 	resultingJob, err := kc.BatchV1().Jobs(kc.ns).Create(context.TODO(), k8sJob, metav1.CreateOptions{})
 	if err != nil {

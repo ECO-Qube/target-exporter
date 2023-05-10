@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"net/http"
 	"os"
 	"time"
@@ -287,7 +288,17 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 		return
 	}
 
-	err := t.kubeClient.SpawnNewWorkload(payload.CpuTarget, payload.CpuCount, time.Duration(payload.JobLength*int(time.Minute)), payload.WorkloadType)
+	builder := NewConcreteStressJobBuilder()
+	// TODO: Error handling
+	job, _ := builder.
+		WithCpuCount(payload.CpuCount).
+		WithCpuLimit(*resource.NewMilliQuantity(int64(payload.CpuTarget)*10, resource.DecimalSI)).
+		WithLength(time.Duration(payload.JobLength * int(time.Minute))).
+		WithWorkloadType(payload.WorkloadType).
+		Build()
+
+	// payload.CpuTarget, payload.CpuCount, time.Duration(payload.JobLength*int(time.Minute)), payload.WorkloadType
+	err := t.kubeClient.SpawnNewWorkload(job)
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
