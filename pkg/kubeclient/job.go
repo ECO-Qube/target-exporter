@@ -77,14 +77,6 @@ type Job interface {
 	RenderK8sJob() (BaseJob, error)
 }
 
-type BatchJob interface {
-	GetName() string
-	GetCpuLimit() resource.Quantity
-	GetCpuCount() int
-	GetWorkloadType() WorkloadType
-	RenderK8sJob() (BaseJob, error)
-}
-
 type BaseJob struct {
 	name         string
 	cpuLimit     resource.Quantity
