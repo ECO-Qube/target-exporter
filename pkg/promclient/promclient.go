@@ -12,6 +12,7 @@ import (
 )
 
 const nodeCpuPromQuery = `100 - 100 * avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m]))`
+const cpuDiffMetricName = "node_cpu_diff"
 
 type Promclient struct {
 	v1.API
@@ -33,41 +34,40 @@ func NewPromClient(client v1.API, logger *zap.Logger) *Promclient {
 	return &Promclient{client, logger}
 }
 
-// GetCpuUsageByRangeSeconds returns an array of NodeCpuUsage structs for each nodes, one measurement per second between
+// GetCpuUsageByRangeSeconds returns an array of NodeCpuUsage for each nodes, one measurement per second between
 // start and end.
+// Payload Sample:
+// [
+//
+//	{
+//	    "nodeName": "ecoqube-dev-default-worker-topo-lx7l2-65d7746-bg5rp",
+//	    "data": [{
+//	        "timestamp": "2022-12-09T11:30:22+01:00",
+//	        "usage": 6.553787878788029
+//	    }, {
+//	        "timestamp": "2022-12-09T11:30:22+01:00",
+//	        "usage": 6.2871212121213205
+//	    }, {
+//	        "timestamp": "2022-12-09T11:30:22+01:00",
+//	        "usage": 6.481060606060495
+//	    }]
+//	},
+//	{
+//	    "nodeName": "ecoqube-dev-default-worker-topo-pf1ls-15d1646-ax8vd",
+//	    "data": [{
+//	        "timestamp": "2022-12-09T11:30:22+01:00",
+//	        "usage": 6.553787878788029
+//	    }, {
+//	        "timestamp": "2022-12-09T11:30:22+01:00",
+//	        "usage": 6.2871212121213205
+//	    }, {
+//	        "timestamp": "2022-12-09T11:30:22+01:00",
+//	        "usage": 6.481060606060495
+//	    }]
+//	}
+//
+// ]
 func (p *Promclient) GetCpuUsageByRangeSeconds(start time.Time, end time.Time) ([]NodeCpuUsage, error) {
-
-	// Sample:
-	/*
-	   [
-	      {
-	           "nodeName": "ecoqube-dev-default-worker-topo-lx7l2-65d7746-bg5rp",
-	           "data": [{
-	               "timestamp": "2022-12-09T11:30:22+01:00",
-	               "usage": 6.553787878788029
-	           }, {
-	               "timestamp": "2022-12-09T11:30:22+01:00",
-	               "usage": 6.2871212121213205
-	           }, {
-	               "timestamp": "2022-12-09T11:30:22+01:00",
-	               "usage": 6.481060606060495
-	           }]
-	       },
-	       {
-	           "nodeName": "ecoqube-dev-default-worker-topo-pf1ls-15d1646-ax8vd",
-	           "data": [{
-	               "timestamp": "2022-12-09T11:30:22+01:00",
-	               "usage": 6.553787878788029
-	           }, {
-	               "timestamp": "2022-12-09T11:30:22+01:00",
-	               "usage": 6.2871212121213205
-	           }, {
-	               "timestamp": "2022-12-09T11:30:22+01:00",
-	               "usage": 6.481060606060495
-	           }]
-	       }
-	   ]
-	*/
 
 	r := v1.Range{
 		Start: start,
@@ -115,10 +115,44 @@ func (p *Promclient) GetCpuUsageByRangeSeconds(start time.Time, end time.Time) (
 	return cpuUsagesPerNode, nil
 }
 
-//func (p *Promclient) GetCpuDiffByRangeSeconds(start time.Time, end time.Time) ([]NodeCpuUsage, error) {
-//	// Get CPU diff for current time per node
-//	// Get targets per node
-//	// For each diff, target of node
-//	// If diff < target
-//	// Set node selector to node
-//}
+// GetCurrentCpuDiff returns the difference between the current CPU usage and the target CPU usage
+// for each node, based on the current time. It makes use of the "node_cpu_diff" metric.
+func (p *Promclient) GetCurrentCpuDiff() ([]NodeCpuUsage, error) {
+	now := time.Now()
+	result, warnings, err := p.Query(ctx.Background(),
+		cpuDiffMetricName,
+		now,
+		v1.WithTimeout(5*time.Second))
+	if err != nil {
+		return nil, err
+	}
+	if len(warnings) > 0 {
+		p.logger.Warn(fmt.Sprintf("Prometheus Warnings: %v\n", warnings))
+	}
+
+	cpuUsagesPerNode := make([]NodeCpuUsage, 0)
+
+	for _, entry := range result.(model.Vector) {
+		// Assume there is only one value per each node (hence Values[0])
+		instants := make([]InstantCpuUsage, 0)
+
+		usage, err := strconv.ParseFloat(entry.Value.String(), 64)
+		if err != nil {
+			return nil, err
+		}
+
+		ts, err := strconv.ParseInt(now.String(), 10, 64)
+		instants = append(instants, InstantCpuUsage{
+			Timestamp: time.Unix(ts, 0),
+			Usage:     usage,
+		})
+
+		cpuUsagesPerNode = append(cpuUsagesPerNode, NodeCpuUsage{
+			NodeName: string(model.LabelSet(entry.Metric)["instance"]),
+			Data:     instants,
+		})
+	}
+
+	return cpuUsagesPerNode, nil
+
+}

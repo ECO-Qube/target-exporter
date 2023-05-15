@@ -1,0 +1,17 @@
+apiVersion: telemetry.intel.com/v1alpha1
+kind: TASPolicy
+metadata:
+  name: schedule-until-at-capacity
+  namespace: default
+spec:
+  strategies:
+    dontschedule:
+      rules:
+        - metricname: node_schedulable
+          operator: Equals
+          target: 0
+    scheduleonmetric:
+      rules:
+        - metricname: node_schedulable
+          operator: Equals
+          target: 1

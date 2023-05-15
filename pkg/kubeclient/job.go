@@ -31,14 +31,14 @@ spec:
   template:
     metadata:
       labels:
-        app: cpu-stress-job-proto
+        telemetry-policy: schedule-until-at-capacity
     spec:
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-                  - key: cpu-diff-policy
+                  - key: schedule-until-at-capacity
                     operator: NotIn
                     values:
                       - violating
@@ -56,6 +56,7 @@ spec:
               cpu: 250m
             limits:
               cpu: 250m
+              telemetry/scheduling: "1"
       restartPolicy: Never
   backoffLimit: 4
 `
@@ -157,7 +158,9 @@ func (s *StressJob) RenderK8sJob() (*v1batch.Job, error) {
 	job.Name = s.name
 	// TODO: What if there are multiple containers?
 	job.ObjectMeta.Name = s.name
-	job.Spec.Template.ObjectMeta.SetLabels(map[string]string{"app": s.name})
+	labels := job.Spec.Template.ObjectMeta.GetLabels()
+	labels["app"] = s.name
+	job.Spec.Template.ObjectMeta.SetLabels(labels)
 	job.Spec.Template.Spec.Containers[0].Resources.Limits["cpu"] = s.cpuLimit
 	job.Spec.Template.Spec.Containers[0].Resources.Requests["cpu"] = s.cpuLimit
 	job.Spec.Template.Spec.Containers[0].Env[0].Name = "MAX_CPU_CORES"

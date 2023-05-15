@@ -80,8 +80,6 @@ curl -X POST localhost:8080/api/v1/workloads \
 ```
 ```
 
-
-
 - Results is in steps of 1 second, e.g. from 12:00:30 to 12:00:40 gives 10 measurements, last second not inclusive.
 - Dates are expressed in RFC3339 ISO format.
 

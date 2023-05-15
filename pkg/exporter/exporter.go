@@ -44,6 +44,20 @@ func (api *Target) GetTarget() float64 {
 	return api.target
 }
 
+type Schedulable struct {
+	schedulable bool
+	gauge       prometheus.Gauge
+}
+
+func (api *Schedulable) Set(schedulable bool) {
+	if schedulable {
+		api.gauge.Set(1)
+	} else {
+		api.gauge.Set(0)
+	}
+	api.schedulable = schedulable
+}
+
 type TargetExporter struct {
 	apiSrv       *http.Server
 	metricsSrv   *http.Server
@@ -52,7 +66,7 @@ type TargetExporter struct {
 	logger       *zap.Logger
 	bootCfg      Config
 	targets      map[string]*Target
-	schedSet     map[string]bool
+	schedulable  map[string]*Schedulable
 	corsDisabled bool
 }
 
@@ -86,6 +100,7 @@ func NewTargetExporter(cfg Config, kubeClient *Kubeclient, promClient *Promclien
 		logger:       logger,
 		bootCfg:      cfg,
 		targets:      make(map[string]*Target), // basic cache for the targets, source of truth is in Prometheus TSDB
+		schedulable:  make(map[string]*Schedulable),
 		corsDisabled: corsEnabled,
 	}
 }
@@ -96,6 +111,8 @@ func (t *TargetExporter) Targets() map[string]*Target {
 
 func (t *TargetExporter) StartMetrics() {
 	t.logger.Info("Loading targets")
+
+	// Targets metrics
 	for nodeName, target := range t.bootCfg.Targets {
 		t.logger.Info(fmt.Sprintf("target loaded: %s\n", nodeName))
 		currentGauge := promauto.NewGauge(prometheus.GaugeOpts{
@@ -105,6 +122,64 @@ func (t *TargetExporter) StartMetrics() {
 		currentGauge.Set(target)
 		t.targets[nodeName] = &Target{target, currentGauge}
 	}
+
+	// Export schedulable metrics
+	for nodeName, _ := range t.bootCfg.Targets {
+		t.logger.Info(fmt.Sprintf("target loaded: %s\n", nodeName))
+		currentGauge := promauto.NewGauge(prometheus.GaugeOpts{
+			Name:        "schedulable",
+			ConstLabels: map[string]string{"instance": nodeName},
+		})
+		currentGauge.Set(0)
+		t.schedulable[nodeName] = &Schedulable{false, currentGauge}
+	}
+
+	go func() {
+		// is there a node n where schedulable = 1?
+		//    yes: is there a node n where diff > 0?
+		//        yes: schedulable_n = 1; schedule()
+		//        no: requeue()
+		//    no: for n where schedulable_n = 1, is diff_n > 0?
+		//        yes: schedule()
+		//        no: schedulable_n = 0; pick another node where diff_n and set its schedulable to 1; schedule()
+		for {
+			diffs, err := t.promClient.GetCurrentCpuDiff()
+			if err != nil {
+				t.logger.Error(fmt.Sprintf("error getting cpu diff: %s", err))
+			}
+			if schedulableNode := t.findSchedulableNode(); schedulableNode == "" {
+				t.logger.Info("no schedulable node found")
+				// All nodes are not schedulable, pick one with diff > 0
+				for _, v := range diffs {
+					if v.Data[0].Usage > 0 {
+						t.logger.Info("found node with diff > 0, setting it to schedulable", zap.String("nodeName", v.NodeName))
+						t.schedulable[v.NodeName].Set(true)
+						break
+					}
+				}
+			} else {
+				t.logger.Info("schedulable node found")
+				// If current schedulable has exceeded target (diff is negative) change schedulable node, else continue
+				for _, currentDiff := range diffs {
+					if currentDiff.NodeName == schedulableNode && currentDiff.Data[0].Usage <= 0 {
+						t.logger.Info("currently schedulable node has diff <= 0, picking another node", zap.String("nodeName", currentDiff.NodeName))
+						t.schedulable[currentDiff.NodeName].Set(false)
+						// Pick a node where diff > 0
+						for _, newNodeDiff := range diffs {
+							if newNodeDiff.Data[0].Usage > 0 {
+								t.logger.Info("found node with diff > 0, setting it to schedulable", zap.String("nodeName", newNodeDiff.NodeName))
+								t.schedulable[newNodeDiff.NodeName].Set(true)
+								break
+							}
+						}
+					}
+				}
+			}
+
+			time.Sleep(1 * time.Second)
+		}
+	}()
+
 	t.metricsSrv = &http.Server{
 		Addr:    ":2112",
 		Handler: promhttp.Handler(),
@@ -148,6 +223,7 @@ func (t *TargetExporter) StartApi() {
 		v1.DELETE("/workloads/pending/last", t.deleteWorkloadsPendingLast)
 
 		v1.GET("/actualCpuUsageByRangeSeconds", t.getCpuUsageByRangeSeconds)
+		v1.GET("/actualCpuDiff", t.getCurrentCpuDiff)
 	}
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -332,6 +408,16 @@ func (t *TargetExporter) getCpuUsageByRangeSeconds(g *gin.Context) {
 	g.JSON(http.StatusOK, cpuUsagesPerNode)
 }
 
+func (t *TargetExporter) getCurrentCpuDiff(g *gin.Context) {
+	cpuDiff, err := t.promClient.GetCurrentCpuDiff()
+	// TODO: Better error handling
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	g.JSON(http.StatusOK, cpuDiff)
+}
+
 /************* HELPER FUNCTIONS *************/
 
 // Helper function to find missing nodes from one map where key is node name, and a map of node names to *Target.
@@ -344,4 +430,13 @@ func checkMissingNodes(targets map[string]*Target, targetsToCheck map[string]flo
 		}
 	}
 	return missing
+}
+
+func (t *TargetExporter) findSchedulableNode() string {
+	for k, v := range t.schedulable {
+		if v.schedulable {
+			return k
+		}
+	}
+	return ""
 }
