@@ -6,7 +6,7 @@ replicaCount: 1
 
 image:
   repository: docker.io/cristianohelio/target-exporter
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: "0.0.8"
 
@@ -73,7 +73,7 @@ cliArgs: ["--cors-disabled=true",
 
 config:
   targetMetricName: "fake_energy_target"
-  targets:
-    ecoqube-dev-default-worker-topo-62xvw-64766d695fxzpd6h-2s6z9: 20
-    ecoqube-dev-default-worker-topo-62xvw-64766d695fxzpd6h-9tgpj: 30
-    ecoqube-dev-default-worker-topo-62xvw-64766d695fxzpd6h-fb9f8: 50
+  targets: {}
+    #ecoqube-dev-default-worker-topo-62xvw-64766d695fxzpd6h-2s6z9: 20
+    #ecoqube-dev-default-worker-topo-62xvw-64766d695fxzpd6h-9tgpj: 30
+    #ecoqube-dev-default-worker-topo-62xvw-64766d695fxzpd6h-fb9f8: 50
