@@ -2,7 +2,5 @@ FROM golang:1.20
 WORKDIR /app
 ADD build build
 ADD config.yaml config.yaml
-ADD go.mod go.mod
-ADD go.sum go.sum
 
 ENTRYPOINT target-exporter

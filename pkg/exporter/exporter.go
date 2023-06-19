@@ -148,7 +148,7 @@ func (t *TargetExporter) StartMetrics() {
 				t.logger.Error(fmt.Sprintf("error getting cpu diff: %s", err))
 			}
 			if schedulableNode := t.findSchedulableNode(); schedulableNode == "" {
-				t.logger.Info("no schedulable node found")
+				t.logger.Debug("no schedulable node found")
 				// All nodes are not schedulable, pick one with diff > 0
 				for _, v := range diffs {
 					if v.Data[0].Usage > 0 {
@@ -158,7 +158,7 @@ func (t *TargetExporter) StartMetrics() {
 					}
 				}
 			} else {
-				t.logger.Info("schedulable node found")
+				t.logger.Debug("schedulable node found :tada:")
 				// If current schedulable has exceeded target (diff is negative) change schedulable node, else continue
 				for _, currentDiff := range diffs {
 					if currentDiff.NodeName == schedulableNode && currentDiff.Data[0].Usage <= 0 {
