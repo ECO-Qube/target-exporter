@@ -36,16 +36,26 @@ var (
 	logger     *zap.Logger
 
 	// Flags
+	config            = "config.yaml"
+	debug             = false
 	isCorsDisabled    = false
 	kubeconfig        = ""
 	promclientAddress = ""
 )
 
 func initLogger() {
-	logger, _ = zap.NewProduction()
+	if debug {
+		logger, _ = zap.NewDevelopment()
+	} else {
+		logger, _ = zap.NewProduction()
+	}
 }
 
 func initFlags() {
+	flag.StringVar(&config, "config", config, "configuration file location")
+
+	flag.BoolVar(&debug, "debug", debug, "debug mode")
+
 	// TODO: Make it proper with Cobra and Viper libraries maybe
 	flag.BoolVar(&isCorsDisabled, "cors-disabled", isCorsDisabled, "disable CORS for localhost:3000")
 
@@ -63,10 +73,10 @@ func initFlags() {
 }
 
 func initCfgFile() {
-	if _, err := os.Stat("./config.yaml"); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(config); errors.Is(err, os.ErrNotExist) {
 		logger.Fatal(fmt.Sprintf("%s: %v", ErrLoadingConfigFile, err))
 	}
-	file, err := os.ReadFile("./config.yaml")
+	file, err := os.ReadFile(config)
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("%s: %v", ErrLoadingConfigFile, err))
 	}
