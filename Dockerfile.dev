@@ -1,6 +1,6 @@
 FROM golang:1.20
 WORKDIR /app
 ADD build build
-ADD config.yaml config.yaml
+ADD config-tilt.yaml config-tilt.yaml
 
-ENTRYPOINT target-exporter
+ENTRYPOINT build/target-exporter --config=config-tilt.yaml --kubeconfig=/kubeconfig/ecoqube-dev.kubeconfig --debug=true --cors-disabled=true --promclient-address=http://prom-service.monitoring.svc.cluster.local:9090
