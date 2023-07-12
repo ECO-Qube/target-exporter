@@ -1,3 +1,6 @@
 .idea/
 build/
 __debug*
+charts/target-exporter/ecoqube-dev.kubeconfig
+config-tilt.yaml
+ecoqube-wkld-dev.kubeconfig
