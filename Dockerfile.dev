@@ -1,6 +1,8 @@
 FROM golang:1.20
+
 WORKDIR /app
+
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
+
 ADD build build
 ADD config-tilt.yaml config-tilt.yaml
-
-ENTRYPOINT build/target-exporter --config=config-tilt.yaml --kubeconfig=/kubeconfig/ecoqube-dev.kubeconfig --debug=true --cors-disabled=true --promclient-address=http://prom-service.monitoring.svc.cluster.local:9090

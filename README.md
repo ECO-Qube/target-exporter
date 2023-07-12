@@ -96,6 +96,13 @@ Successful response: [pastebin](https://pastebin.com/h43MWr6f)
 
 https://prometheus.io/docs/instrumenting/writing_exporters/#target-labels-not-static-scraped-labels
 
+### Tilt Debugging
+
+- Note that in the Tiltfile the `--continue` option is passed to Delve which instructs the debugger to start the 
+process immediately. To instruct Tilt to not continue, remove the option from the tiltfile. TODO: Maybe make a custom
+button on target-exporter to toggle this behavior (i.e. click -> toggle to continue after restart, click again -> toggle
+to not continue after restart).
+
 ## TODOs
 
 - [x] Prometheus doesn't have permission to scrape resources in namespaces different from its own (kube-prom-stack). It
