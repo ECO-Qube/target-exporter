@@ -7,7 +7,9 @@ import (
 	v1batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"sort"
 	//
@@ -18,6 +20,10 @@ import (
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/azure"
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
+)
+
+const (
+	JobSelectorLabel = "batch.kubernetes.io/job-name"
 )
 
 var policy = metav1.DeletePropagationForeground
@@ -31,6 +37,20 @@ type Kubeclient struct {
 
 func NewKubeClient(client *kubernetes.Clientset, logger *zap.Logger) *Kubeclient {
 	return &Kubeclient{client, logger, "default"}
+}
+
+func (kc *Kubeclient) PatchCpuLimit(limit resource.Quantity, podName string) error {
+	kc.logger.Info("Patching Job limit", zap.String("name", podName),
+		zap.String("newLimit", limit.String()))
+	// Then patch the container's CPU limit
+	patch := fmt.Sprintf(`{"spec":{"containers":[{"name":"cpu-stress-job-proto", "resources":{"requests":{"cpu":"%s"}, "limits": {"cpu": "%s"}}}]}}`, limit.String(), limit.String())
+	patchedPod, err := kc.CoreV1().Pods(kc.ns).Patch(context.TODO(), podName, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
+	if err != nil {
+		kc.logger.Error("Error patching pod", zap.Error(err))
+		return err
+	}
+	kc.logger.Info("Pod patched successfully", zap.String("name", patchedPod.Name))
+	return nil
 }
 
 func (kc *Kubeclient) GetPodsInNamespace() (*v1.PodList, error) {

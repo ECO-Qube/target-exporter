@@ -140,6 +140,10 @@ func (s *StressJob) GetCpuLimit() resource.Quantity {
 	return s.cpuLimit
 }
 
+func (s *StressJob) SetCpuLimit(limit resource.Quantity) {
+	s.cpuLimit = limit
+}
+
 func (s *StressJob) GetCpuCount() int {
 	return s.cpuCount
 }

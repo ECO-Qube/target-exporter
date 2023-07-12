@@ -15,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	. "git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
@@ -219,6 +221,7 @@ func (t *TargetExporter) StartApi() {
 
 		v1.GET("/workloads", t.getWorkloads)
 		v1.POST("/workloads", t.postWorkloads)
+		v1.PATCH("/workload", t.patchWorkload)
 		v1.DELETE("/workloads/completed", t.deleteWorkloadsCompleted)
 		v1.DELETE("/workloads/pending/last", t.deleteWorkloadsPendingLast)
 
@@ -325,6 +328,7 @@ type Workload struct {
 	Status         string `json:"status"`
 	SubmissionDate string `json:"submissionDate"`
 	NodeName       string `json:"nodeName"`
+	CpuTarget      int    `json:"cpuTarget"`
 }
 
 type WorkloadsList struct {
@@ -341,17 +345,25 @@ func (t *TargetExporter) getWorkloads(g *gin.Context) {
 	}
 	workloads := make([]Workload, len(pods.Items))
 	for i, pod := range pods.Items {
+		// TODO: Refactor
+		target := pod.Spec.Containers[0].Resources.Limits.Cpu().AsDec().SetScale(1)
+		targetFormatted, _ := strconv.Atoi(strings.Split(target.String(), ".")[0])
+		if targetFormatted == 0 {
+			targetFormatted = 100
+		}
 		workloads[i] = Workload{
 			Name:           pod.Name,
 			Status:         string(pod.Status.Phase),
 			SubmissionDate: pod.CreationTimestamp.String(),
 			NodeName:       pod.Spec.NodeName,
+			CpuTarget:      targetFormatted,
 		}
 	}
 	g.JSON(http.StatusOK, WorkloadsList{Workloads: workloads})
 }
 
 type WorkloadRequest struct {
+	JobName      string       `json:"jobName,omitempty"`
 	CpuTarget    int          `json:"cpuTarget"`
 	JobLength    int          `json:"jobLength"`
 	CpuCount     int          `json:"cpuCount"`
@@ -359,6 +371,7 @@ type WorkloadRequest struct {
 }
 
 func (t *TargetExporter) postWorkloads(g *gin.Context) {
+	// TODO: Note JobName can't be set by user yet
 	payload := WorkloadRequest{}
 	if err := g.BindJSON(&payload); err != nil {
 		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -367,9 +380,10 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 
 	builder := NewConcreteStressJobBuilder()
 	// TODO: Error handling
+	// TODO: It probably makes sense to persist these jobs in a separate database...
 	job, _ := builder.
 		WithCpuCount(payload.CpuCount).
-		WithCpuLimit(*resource.NewMilliQuantity(int64(payload.CpuTarget)*10, resource.DecimalSI)).
+		WithCpuLimit(percentageToResourceQuantity(payload.CpuTarget)).
 		WithLength(time.Duration(payload.JobLength * int(time.Minute))).
 		WithWorkloadType(payload.WorkloadType).
 		Build()
@@ -384,6 +398,29 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 	g.JSON(http.StatusOK, gin.H{
 		"message": "success",
 	})
+}
+
+func percentageToResourceQuantity(percentage int) resource.Quantity {
+	return *resource.NewMilliQuantity(int64(percentage)*10, resource.DecimalSI)
+}
+
+func (t *TargetExporter) patchWorkload(g *gin.Context) {
+	// TODO: Currently only supports patching of CPU limits
+	payload := WorkloadRequest{}
+	if err := g.BindJSON(&payload); err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if payload.JobName == "" {
+		g.JSON(http.StatusBadRequest, gin.H{"error": "jobName must be specified"})
+		return
+	}
+	err := t.kubeClient.PatchCpuLimit(percentageToResourceQuantity(payload.CpuTarget), payload.JobName)
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	t.logger.Info("workload patched", zap.String("workload", fmt.Sprintf("%v", payload)))
 }
 
 // GetCpuUsageByRangeSeconds returns a timeseries of the CPU usage of each node.
