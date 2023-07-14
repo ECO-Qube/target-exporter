@@ -12,6 +12,7 @@ import (
 )
 
 const nodeCpuPromQuery = `100 - 100 * avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m]))`
+const nodeCpuCountQuery = `count without(cpu, mode) (node_cpu_seconds_total{mode="idle"})`
 const cpuDiffMetricName = "node_cpu_diff"
 
 type Promclient struct {
@@ -155,4 +156,27 @@ func (p *Promclient) GetCurrentCpuDiff() ([]NodeCpuUsage, error) {
 
 	return cpuUsagesPerNode, nil
 
+}
+
+func (p *Promclient) GetCpuCounts() (map[string]int, error) {
+	result, warnings, err := p.Query(ctx.Background(),
+		nodeCpuCountQuery,
+		time.Now(),
+		v1.WithTimeout(5*time.Second))
+	if err != nil {
+		return nil, err
+	}
+	if len(warnings) > 0 {
+		p.logger.Warn(fmt.Sprintf("Prometheus Warnings: %v\n", warnings))
+	}
+	cpuCounts := make(map[string]int)
+	for _, entry := range result.(model.Vector) {
+		intValue, err := strconv.ParseInt(entry.Value.String(), 10, 32)
+		if err != nil {
+			return nil, err
+		}
+		cpuCounts[string(model.LabelSet(entry.Metric)["instance"])] = int(intValue)
+	}
+
+	return cpuCounts, nil
 }

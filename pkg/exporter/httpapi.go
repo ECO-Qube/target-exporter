@@ -1,0 +1,243 @@
+package exporter
+
+import (
+	"fmt"
+	"git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
+	"git.helio.dev/eco-qube/target-exporter/pkg/middlewares"
+	ginzap "github.com/gin-contrib/zap"
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+)
+
+func (t *TargetExporter) StartApi() {
+	// Setup routes
+	r := gin.Default()
+
+	// Setup logger
+
+	// Add a ginzap middleware, which:
+	//   - Logs all requests, like a combined access and error log.
+	//   - Logs to stdout.
+	//   - RFC3339 with UTC time format.
+	r.Use(ginzap.Ginzap(t.logger, time.RFC3339, true))
+
+	// Logs all panic to error log
+	//   - stack means whether output the stack info.
+	r.Use(ginzap.RecoveryWithZap(t.logger, true))
+
+	if t.corsDisabled {
+		r.Use(middlewares.CorsDisabled)
+	}
+	v1 := r.Group("/api/v1")
+	{
+		v1.GET("/targets", t.getTargetsResponse)
+		v1.POST("/targets", t.postTargetsRequest)
+
+		v1.GET("/workloads", t.getWorkloads)
+		v1.POST("/workloads", t.postWorkloads)
+		v1.PATCH("/workload", t.patchWorkload)
+		v1.DELETE("/workloads/completed", t.deleteWorkloadsCompleted)
+		v1.DELETE("/workloads/pending/last", t.deleteWorkloadsPendingLast)
+
+		v1.GET("/actualCpuUsageByRangeSeconds", t.getCpuUsageByRangeSeconds)
+		v1.GET("/actualCpuDiff", t.getCurrentCpuDiff)
+	}
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: r,
+	}
+
+	t.apiSrv = srv
+
+	go func() {
+		t.logger.Info("Starting API server")
+		if err := t.apiSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			t.logger.Fatal(fmt.Sprintf("listen: %s\n", err))
+		}
+	}()
+}
+
+// TODO: Make configurable with namespace or label selector
+func (t *TargetExporter) getWorkloads(g *gin.Context) {
+	pods, err := t.kubeClient.GetPodsInNamespace()
+	if err != nil {
+		// TODO: More granular error handling
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	workloads := make([]Workload, len(pods.Items))
+	for i, pod := range pods.Items {
+		// TODO: Refactor
+		target := pod.Spec.Containers[0].Resources.Limits.Cpu().AsDec().SetScale(1)
+		targetFormatted, _ := strconv.Atoi(strings.Split(target.String(), ".")[0])
+		if targetFormatted == 0 {
+			targetFormatted = 100
+		}
+		workloads[i] = Workload{
+			Name:           pod.Name,
+			Status:         string(pod.Status.Phase),
+			SubmissionDate: pod.CreationTimestamp.String(),
+			NodeName:       pod.Spec.NodeName,
+			CpuTarget:      targetFormatted,
+		}
+	}
+	g.JSON(http.StatusOK, WorkloadsList{Workloads: workloads})
+}
+
+func (t *TargetExporter) getTargetsResponse(g *gin.Context) {
+	// TODO: Remove debug code
+	// time.Sleep(500 * time.Millisecond)
+	// g.JSON(404, "error")
+	payload := TargetsResponse{Targets: make(map[string]float64)}
+	for node, target := range t.targets {
+		payload.Targets[node] = target.GetTarget()
+	}
+	g.JSON(http.StatusOK, payload)
+}
+
+func (t *TargetExporter) postTargetsRequest(g *gin.Context) {
+	payload := TargetsRequest{}
+	if err := g.BindJSON(&payload); err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// For now, any missing node in the payload will fail the whole request. Might make this more lenient in the future.
+	if missingNodes := checkMissingNodes(t.targets, payload.Targets); len(missingNodes) > 0 {
+		g.JSON(http.StatusBadRequest, gin.H{"error": ErrNodeNonexistent, "nodes": missingNodes})
+		return
+	}
+	for node, target := range payload.Targets {
+		t.Targets()[node].Set(target)
+	}
+	g.JSON(http.StatusOK, gin.H{
+		"message": "success",
+	})
+}
+
+// if no message is returned to caller and 200 status,
+// nothing was done but no error. If no error and something was deleted, "success" is returned
+// In all other cases, an error is returned
+func (t *TargetExporter) deleteWorkloadsCompleted(g *gin.Context) {
+	done, err := t.kubeClient.ClearCompletedWorkloads()
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if done {
+		g.JSON(http.StatusOK, gin.H{
+			"message": "success",
+		})
+	}
+}
+
+// if no message is returned to caller and 200 status,
+// nothing was done but no error. If no error and something was deleted, "success" is returned
+// In all other cases, an error is returned
+func (t *TargetExporter) deleteWorkloadsPendingLast(g *gin.Context) {
+	done, err := t.kubeClient.DeletePendingWorkload()
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if done {
+		g.JSON(http.StatusOK, gin.H{
+			"message": "success",
+		})
+	}
+}
+
+func (t *TargetExporter) postWorkloads(g *gin.Context) {
+	// TODO: Note JobName can't be set by user yet
+	payload := WorkloadRequest{}
+	if err := g.BindJSON(&payload); err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	builder := kubeclient.NewConcreteStressJobBuilder()
+	// TODO: Error handling
+	// TODO: It probably makes sense to persist these jobs in a separate database...
+	cpuTarget, err := t.percentageToResourceQuantity(float64(payload.CpuTarget), "ecoqube-wkld-dev-default-worker-topo-8rvlb-6f9ddf5f66xh6qcgxldl")
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	job, _ := builder.
+		WithCpuCount(payload.CpuCount).
+		WithCpuLimit(cpuTarget).
+		WithLength(time.Duration(payload.JobLength * int(time.Minute))).
+		WithWorkloadType(payload.WorkloadType).
+		Build()
+
+	// payload.CpuTarget, payload.CpuCount, time.Duration(payload.JobLength*int(time.Minute)), payload.WorkloadType
+	err = t.kubeClient.SpawnNewWorkload(job)
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	g.JSON(http.StatusOK, gin.H{
+		"message": "success",
+	})
+}
+
+func (t *TargetExporter) patchWorkload(g *gin.Context) {
+	// TODO: Currently only supports patching of CPU limits
+	payload := WorkloadRequest{}
+	if err := g.BindJSON(&payload); err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if payload.JobName == "" {
+		g.JSON(http.StatusBadRequest, gin.H{"error": "jobName must be specified"})
+		return
+	}
+	cpuTarget, err := t.percentageToResourceQuantity(float64(payload.CpuTarget),
+		"ecoqube-wkld-dev-default-worker-topo-8rvlb-6f9ddf5f66xh6qcgxldl")
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	err = t.kubeClient.PatchCpuLimit(cpuTarget, payload.JobName)
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	t.logger.Info("workload patched", zap.String("workload", fmt.Sprintf("%v", payload)))
+}
+
+// GetCpuUsageByRangeSeconds returns a timeseries of the CPU usage of each node.
+func (t *TargetExporter) getCpuUsageByRangeSeconds(g *gin.Context) {
+	// Parse ISO date start and end from HTTP get request using Gin framework
+	start, err := time.Parse(time.RFC3339, g.Query("start"))
+	if err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	end, err := time.Parse(time.RFC3339, g.Query("end"))
+	if err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	cpuUsagesPerNode, err := t.promClient.GetCpuUsageByRangeSeconds(start, end)
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	g.JSON(http.StatusOK, cpuUsagesPerNode)
+}
+
+func (t *TargetExporter) getCurrentCpuDiff(g *gin.Context) {
+	cpuDiff, err := t.promClient.GetCurrentCpuDiff()
+	// TODO: Better error handling
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	g.JSON(http.StatusOK, cpuDiff)
+}
