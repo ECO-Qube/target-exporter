@@ -8,8 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -71,18 +69,18 @@ func (t *TargetExporter) getWorkloads(g *gin.Context) {
 	}
 	workloads := make([]Workload, len(pods.Items))
 	for i, pod := range pods.Items {
-		// TODO: Refactor
-		target := pod.Spec.Containers[0].Resources.Limits.Cpu().AsDec().SetScale(1)
-		targetFormatted, _ := strconv.Atoi(strings.Split(target.String(), ".")[0])
-		if targetFormatted == 0 {
-			targetFormatted = 100
+		target, err := t.resourceQuantityToPercentage(*pod.Spec.Containers[0].Resources.Limits.Cpu(),
+			"ecoqube-wkld-dev-default-worker-topo-8rvlb-6f9ddf5f66xh6qcgxldl")
+		if err != nil {
+			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
 		}
 		workloads[i] = Workload{
 			Name:           pod.Name,
 			Status:         string(pod.Status.Phase),
 			SubmissionDate: pod.CreationTimestamp.String(),
 			NodeName:       pod.Spec.NodeName,
-			CpuTarget:      targetFormatted,
+			CpuTarget:      int(target),
 		}
 	}
 	g.JSON(http.StatusOK, WorkloadsList{Workloads: workloads})
@@ -151,7 +149,7 @@ func (t *TargetExporter) deleteWorkloadsPendingLast(g *gin.Context) {
 }
 
 func (t *TargetExporter) postWorkloads(g *gin.Context) {
-	// TODO: Note JobName can't be set by user yet
+	// TODO: Note PodName can't be set by user yet
 	payload := WorkloadRequest{}
 	if err := g.BindJSON(&payload); err != nil {
 		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -159,9 +157,13 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 	}
 
 	builder := kubeclient.NewConcreteStressJobBuilder()
-	// TODO: Error handling
-	// TODO: It probably makes sense to persist these jobs in a separate database...
-	cpuTarget, err := t.percentageToResourceQuantity(float64(payload.CpuTarget), "ecoqube-wkld-dev-default-worker-topo-8rvlb-6f9ddf5f66xh6qcgxldl")
+	// TODO: get node name dynamically https://www.notion.so/helioag/Map-input-percentage-of-cpu-limits-to-range-of-CPUs-for-node-c6bd901a457243d5afece2ae0a9ac150?pvs=4
+	var dummy string
+	for k, _ := range t.Targets() {
+		dummy = k
+		break
+	}
+	cpuTarget, err := t.percentageToResourceQuantity(float64(payload.CpuTarget), dummy)
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -192,17 +194,25 @@ func (t *TargetExporter) patchWorkload(g *gin.Context) {
 		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if payload.JobName == "" {
-		g.JSON(http.StatusBadRequest, gin.H{"error": "jobName must be specified"})
+	if payload.PodName == "" {
+		g.JSON(http.StatusBadRequest, gin.H{"error": "podName must be specified"})
 		return
 	}
-	cpuTarget, err := t.percentageToResourceQuantity(float64(payload.CpuTarget),
-		"ecoqube-wkld-dev-default-worker-topo-8rvlb-6f9ddf5f66xh6qcgxldl")
+	nodeName, err := t.kubeClient.GetPodNodeName(payload.PodName)
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	err = t.kubeClient.PatchCpuLimit(cpuTarget, payload.JobName)
+	if nodeName == "" {
+		g.JSON(http.StatusBadRequest, gin.H{"error": "cannot set CPU limit for a pod that is not in Running state"})
+		return
+	}
+	cpuTarget, err := t.percentageToResourceQuantity(float64(payload.CpuTarget), nodeName)
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	err = t.kubeClient.PatchCpuLimit(cpuTarget, payload.PodName)
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

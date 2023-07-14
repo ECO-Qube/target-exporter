@@ -166,7 +166,7 @@ func (s *StressJob) RenderK8sJob() (*v1batch.Job, error) {
 	labels["app"] = s.name
 	job.Spec.Template.ObjectMeta.SetLabels(labels)
 	job.Spec.Template.Spec.Containers[0].Resources.Limits["cpu"] = s.cpuLimit
-	job.Spec.Template.Spec.Containers[0].Resources.Requests["cpu"] = s.cpuLimit
+	job.Spec.Template.Spec.Containers[0].Resources.Requests["cpu"] = *resource.NewMilliQuantity(s.cpuLimit.MilliValue()/4, resource.DecimalSI)
 	job.Spec.Template.Spec.Containers[0].Env[0].Name = "MAX_CPU_CORES"
 	job.Spec.Template.Spec.Containers[0].Env[0].Value = strconv.Itoa(s.cpuCount)
 	job.Spec.Template.Spec.Containers[0].Env[1].Name = "STRESS_SYSTEM_FOR"

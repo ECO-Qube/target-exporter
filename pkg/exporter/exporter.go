@@ -221,7 +221,7 @@ type WorkloadsList struct {
 }
 
 type WorkloadRequest struct {
-	JobName      string       `json:"jobName,omitempty"`
+	PodName      string       `json:"podName,omitempty"`
 	CpuTarget    int          `json:"cpuTarget"`
 	JobLength    int          `json:"jobLength"`
 	CpuCount     int          `json:"cpuCount"`
@@ -240,7 +240,20 @@ func (t *TargetExporter) percentageToResourceQuantity(percentage float64, nodeNa
 	cpuCount := cpuCounts[nodeName]
 	// Map percentage to range 0-num_cpus
 	percentage = (percentage / 100) * float64(cpuCount)
-	return *resource.NewQuantity(int64(percentage)*10, resource.DecimalSI), nil
+	return *resource.NewMilliQuantity(int64(percentage*1000), "DecimalSI"), nil
+}
+
+func (t *TargetExporter) resourceQuantityToPercentage(quantity resource.Quantity, nodeName string) (float64, error) {
+	// Get schedulable node
+	cpuCounts, err := t.promClient.GetCpuCounts()
+	if err != nil {
+		t.logger.Error("failed to get cpu counts", zap.Error(err))
+		return 0, err
+	}
+	cpuCount := cpuCounts[nodeName]
+	// Map quantity to range 0-num_cpus
+	percentage := (float64(quantity.MilliValue()) / 1000) / float64(cpuCount)
+	return percentage * 100, nil
 }
 
 /************* HELPER FUNCTIONS *************/

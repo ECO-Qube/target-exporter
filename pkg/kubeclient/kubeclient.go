@@ -182,6 +182,15 @@ func (kc *Kubeclient) IsNodeNameValid(name string) bool {
 	return true
 }
 
+func (kc *Kubeclient) GetPodNodeName(podName string) (string, error) {
+	pod, err := kc.CoreV1().Pods(kc.ns).Get(context.TODO(), podName, metav1.GetOptions{})
+	if err != nil {
+		kc.logger.Error("Error getting Job", zap.Error(err))
+		return "", err
+	}
+	return pod.Spec.NodeName, nil
+}
+
 func isOwnerPresent(ownerRefs []metav1.OwnerReference, ownerName string, kind string) bool {
 	for _, ownerRef := range ownerRefs {
 		if ownerRef.Name == ownerName && ownerRef.Kind == kind {
