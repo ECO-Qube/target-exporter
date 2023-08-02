@@ -250,6 +250,13 @@ func (t *TargetExporter) resourceQuantityToPercentage(quantity resource.Quantity
 		t.logger.Error("failed to get cpu counts", zap.Error(err))
 		return 0, err
 	}
+	// TODO: Eventually get rid of this (when CPU counts will be heterogeneous)
+	if nodeName == "" {
+		for k, _ := range cpuCounts {
+			nodeName = k
+			break
+		}
+	}
 	cpuCount := cpuCounts[nodeName]
 	// Map quantity to range 0-num_cpus
 	percentage := (float64(quantity.MilliValue()) / 1000) / float64(cpuCount)

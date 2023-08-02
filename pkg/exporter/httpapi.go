@@ -70,7 +70,7 @@ func (t *TargetExporter) getWorkloads(g *gin.Context) {
 	workloads := make([]Workload, len(pods.Items))
 	for i, pod := range pods.Items {
 		target, err := t.resourceQuantityToPercentage(*pod.Spec.Containers[0].Resources.Limits.Cpu(),
-			"ecoqube-wkld-dev-default-worker-topo-8rvlb-6f9ddf5f66xh6qcgxldl")
+			"")
 		if err != nil {
 			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
