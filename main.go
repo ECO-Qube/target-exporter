@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"git.helio.dev/eco-qube/target-exporter/pkg/selfdriving"
 	promapi "github.com/prometheus/client_golang/api"
 	promapiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"go.uber.org/zap"
@@ -148,7 +149,9 @@ func init() {
 
 	checkConfig()
 
-	api = NewTargetExporter(cfg, kubeclient, promclient, promclientAddress, logger, isCorsDisabled)
+	selfDriving := selfdriving.NewSelfDriving()
+
+	api = NewTargetExporter(cfg, kubeclient, promclient, promclientAddress, logger, isCorsDisabled, selfDriving)
 }
 
 func main() {

@@ -43,6 +43,8 @@ func (t *TargetExporter) StartApi() {
 
 		v1.GET("/actualCpuUsageByRangeSeconds", t.getCpuUsageByRangeSeconds)
 		v1.GET("/actualCpuDiff", t.getCurrentCpuDiff)
+
+		v1.PUT("/self-driving", t.putSelfDriving)
 	}
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -250,4 +252,20 @@ func (t *TargetExporter) getCurrentCpuDiff(g *gin.Context) {
 		return
 	}
 	g.JSON(http.StatusOK, cpuDiff)
+}
+
+func (t *TargetExporter) putSelfDriving(g *gin.Context) {
+	payload := SelfDrivingRequest{}
+	if err := g.BindJSON(&payload); err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if payload.Enabled {
+		t.selfDriving.Start()
+	} else {
+		t.selfDriving.Stop()
+	}
+	g.JSON(http.StatusOK, gin.H{
+		"message": "success",
+	})
 }

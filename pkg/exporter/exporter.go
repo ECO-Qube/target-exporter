@@ -2,7 +2,9 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"git.helio.dev/eco-qube/target-exporter/pkg/selfdriving"
 	"github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,6 +18,7 @@ import (
 
 	. "git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
 	. "git.helio.dev/eco-qube/target-exporter/pkg/promclient"
+	. "git.helio.dev/eco-qube/target-exporter/pkg/selfdriving"
 )
 
 const (
@@ -60,6 +63,7 @@ type TargetExporter struct {
 	metricsSrv   *http.Server
 	promClient   *Promclient
 	kubeClient   *Kubeclient
+	selfDriving  *SelfDriving
 	logger       *zap.Logger
 	bootCfg      Config
 	targets      map[string]*Target
@@ -67,7 +71,7 @@ type TargetExporter struct {
 	corsDisabled bool
 }
 
-func NewTargetExporter(cfg Config, kubeClient *Kubeclient, promClient *Promclient, promClientAddress string, logger *zap.Logger, corsEnabled bool) *TargetExporter {
+func NewTargetExporter(cfg Config, kubeClient *Kubeclient, promClient *Promclient, promClientAddress string, logger *zap.Logger, corsEnabled bool, selfDriving *selfdriving.SelfDriving) *TargetExporter {
 	// Init Prometheus client
 	client, err := api.NewClient(api.Config{
 		// TODO: How to get address from v1.API embedded in Promclient instead of passing an additional parameter?
@@ -99,6 +103,7 @@ func NewTargetExporter(cfg Config, kubeClient *Kubeclient, promClient *Promclien
 		targets:      make(map[string]*Target), // basic cache for the targets, source of truth is in Prometheus TSDB
 		schedulable:  make(map[string]*Schedulable),
 		corsDisabled: corsEnabled,
+		selfDriving:  selfDriving,
 	}
 }
 
@@ -184,7 +189,7 @@ func (t *TargetExporter) StartMetrics() {
 
 	go func() {
 		t.logger.Info("Starting metrics server")
-		if err := t.metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := t.metricsSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			t.logger.Fatal(fmt.Sprintf("listen: %s\n", err))
 		}
 	}()
@@ -228,6 +233,33 @@ type WorkloadRequest struct {
 	WorkloadType WorkloadType `json:"workloadType"`
 }
 
+type SelfDrivingRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
+/************* HELPER FUNCTIONS *************/
+
+// Helper function to find missing nodes from one map where key is node name, and a map of node names to *Target.
+// Returns nil if no missing nodes were found.
+func checkMissingNodes(targets map[string]*Target, targetsToCheck map[string]float64) []string {
+	missing := make([]string, 0)
+	for node, _ := range targetsToCheck {
+		if _, exists := targets[node]; !exists {
+			missing = append(missing, node)
+		}
+	}
+	return missing
+}
+
+func (t *TargetExporter) findSchedulableNode() string {
+	for k, v := range t.schedulable {
+		if v.schedulable {
+			return k
+		}
+	}
+	return ""
+}
+
 // percentageToResourceQuantity converts a percentage to a resource.Quantity taking into account
 // the number of CPU cores on the machine
 func (t *TargetExporter) percentageToResourceQuantity(percentage float64, nodeName string) (resource.Quantity, error) {
@@ -261,27 +293,4 @@ func (t *TargetExporter) resourceQuantityToPercentage(quantity resource.Quantity
 	// Map quantity to range 0-num_cpus
 	percentage := (float64(quantity.MilliValue()) / 1000) / float64(cpuCount)
 	return percentage * 100, nil
-}
-
-/************* HELPER FUNCTIONS *************/
-
-// Helper function to find missing nodes from one map where key is node name, and a map of node names to *Target.
-// Returns nil if no missing nodes were found.
-func checkMissingNodes(targets map[string]*Target, targetsToCheck map[string]float64) []string {
-	missing := make([]string, 0)
-	for node, _ := range targetsToCheck {
-		if _, exists := targets[node]; !exists {
-			missing = append(missing, node)
-		}
-	}
-	return missing
-}
-
-func (t *TargetExporter) findSchedulableNode() string {
-	for k, v := range t.schedulable {
-		if v.schedulable {
-			return k
-		}
-	}
-	return ""
 }
