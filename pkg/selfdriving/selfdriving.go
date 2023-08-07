@@ -4,77 +4,88 @@ import (
 	"fmt"
 	"git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
 	"git.helio.dev/eco-qube/target-exporter/pkg/promclient"
-	"sync/atomic"
+	"sync"
 	"time"
 )
+
+const Start = "start"
+const Stop = "stop"
 
 type SelfDriving struct {
 	kubeClient *kubeclient.Kubeclient
 	promClient *promclient.Promclient
 
-	pause             chan bool
-	isRunning         bool
-	isCommandOnFlight atomic.Bool
-	initialized       bool
+	startStop   chan string
+	initialized bool
+	mu          sync.Mutex
 }
 
 // TODO: Since operations on on isCommandOnFlight are not atomic, although there are no data races, this does not work for now
 // if two functions check isCommandOnFlight, continue executing, and one of the two sets it to true, the other will still be running...
 // solution: use a mutex (but then how to check if the mutex is locked without blocking?) or find how to use channels correctly
+
 func NewSelfDriving() *SelfDriving {
-	return &SelfDriving{pause: make(chan bool), isRunning: false, isCommandOnFlight: atomic.Bool{}, initialized: false}
+	return &SelfDriving{startStop: make(chan string), initialized: false}
 }
 
 func (s *SelfDriving) Start() error {
-	if s.isCommandOnFlight.Load() {
-		fmt.Println("debug: command on flight")
-		return fmt.Errorf("command on flight")
-	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	fmt.Println("Starting controller")
 
-	s.isCommandOnFlight.Store(true)
 	if !s.initialized {
 		s.initialized = true
 		s.run()
 	}
-	s.pause <- false
-	s.isCommandOnFlight.Store(false)
+	s.startStop <- Start
 
 	return nil
 }
 
 func (s *SelfDriving) Stop() error {
-	if s.isCommandOnFlight.Load() {
-		fmt.Println("debug: command on flight")
-		return fmt.Errorf("command on flight")
-	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	fmt.Println("Stopping controller")
 
-	s.isCommandOnFlight.Store(true)
-	s.pause <- true
-	s.isCommandOnFlight.Store(false)
+	s.startStop <- Stop
 
 	return nil
 }
 
 func (s *SelfDriving) run() {
 	go func() {
+		run := false
 		for {
-			if s.isCommandOnFlight.Load() || !s.initialized {
-				command := <-s.pause
-				if !command {
-					s.isRunning = true
+			select {
+			case command, ok := <-s.startStop:
+				if ok {
+					if command == Start {
+						run = true
+					} else {
+						run = false
+					}
 				} else {
-					s.isRunning = false
-					fmt.Println("debug: pausing until new command")
+					fmt.Println("Channel closed!")
+					break
 				}
+			default:
+				fmt.Println("No value ready, moving on.")
 			}
 
-			// My logic here
-			fmt.Println("debug: loop")
+			if run {
+				// My logic here
+				fmt.Println("debug: loop")
+			}
 			time.Sleep(2 * time.Second)
 		}
 	}()
+}
+
+func (s *SelfDriving) Reconcile() {
+	// Get current cpu diff
+	// Get target per node
+	// Check which nodes have diff > target + (5%) or diff < target - (5%)
+	//
 }
