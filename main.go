@@ -5,14 +5,16 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"git.helio.dev/eco-qube/target-exporter/pkg/selfdriving"
+	. "git.helio.dev/eco-qube/target-exporter/pkg/scheduling"
 	promapi "github.com/prometheus/client_golang/api"
 	promapiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -20,7 +22,7 @@ import (
 	"syscall"
 	"time"
 
-	. "git.helio.dev/eco-qube/target-exporter/pkg/exporter"
+	. "git.helio.dev/eco-qube/target-exporter/pkg/infrastructure"
 	. "git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
 	. "git.helio.dev/eco-qube/target-exporter/pkg/promclient"
 )
@@ -30,11 +32,13 @@ const (
 )
 
 var (
-	api        *TargetExporter
-	kubeclient *Kubeclient
-	promclient *Promclient
-	cfg        Config
-	logger     *zap.Logger
+	orchestrator *Orchestrator
+	api          *TargetExporter
+	kubeclient   *Kubeclient
+	promclient   *Promclient
+	metricsSrv   *http.Server
+	bootCfg      Config
+	logger       *zap.Logger
 
 	// Flags
 	config            = "config.yaml"
@@ -81,8 +85,8 @@ func initCfgFile() {
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("%s: %v", ErrLoadingConfigFile, err))
 	}
-	cfg = Config{}
-	err = yaml.Unmarshal(file, &cfg)
+	bootCfg = Config{}
+	err = yaml.Unmarshal(file, &bootCfg)
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("%s: %v", ErrLoadingConfigFile, err))
 	}
@@ -125,11 +129,22 @@ func initPromClient() {
 	promclient = NewPromClient(promv1, logger)
 }
 
+func initMetricsServer() {
+	metricsSrv = &http.Server{
+		Addr:    ":2112",
+		Handler: promhttp.Handler(),
+	}
+}
+
+func initOrchestrator() {
+	orchestrator = NewOrchestrator(kubeclient, promclient, logger, api.Targets(), api.Schedulable())
+}
+
 // checkConfig checks if the config is valid, in particular it makes sure that the node names specified in the
 // config are valid node names in the cluster
 func checkConfig() {
 	invalidNames := make([]string, 0)
-	for k, _ := range cfg.Targets {
+	for k, _ := range bootCfg.Targets {
 		if !kubeclient.IsNodeNameValid(k) {
 			invalidNames = append(invalidNames, k)
 		}
@@ -145,13 +160,13 @@ func init() {
 	initLogger()
 	initCfgFile()
 	initKubeClient()
-	initPromClient()
 
 	checkConfig()
 
-	selfDriving := selfdriving.NewSelfDriving()
+	initMetricsServer()
+	initPromClient()
 
-	api = NewTargetExporter(cfg, kubeclient, promclient, promclientAddress, logger, isCorsDisabled, selfDriving)
+	api = NewTargetExporter(metricsSrv, bootCfg, isCorsDisabled, logger, orchestrator)
 }
 
 func main() {
@@ -160,6 +175,7 @@ func main() {
 
 	api.StartMetrics()
 	api.StartApi()
+	initOrchestrator()
 
 	// Listen for the interrupt signal from the OS
 	<-ctx.Done()

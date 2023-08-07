@@ -180,3 +180,11 @@ func (p *Promclient) GetCpuCounts() (map[string]int, error) {
 
 	return cpuCounts, nil
 }
+
+func GetAvgInstantUsage(usages []InstantCpuUsage) float64 {
+	var sum float64
+	for _, usage := range usages {
+		sum += usage.Usage
+	}
+	return sum / float64(len(usages))
+}

@@ -180,6 +180,5 @@ func (s *StressJob) RenderK8sJob() (*v1batch.Job, error) {
 }
 
 func generateJobName(jobCpuLimit string) string {
-	fmt.Println(jobCpuLimit)
 	return jobCpuLimit + "-cpu-stresstest-" + uuid.New().String()[0:8]
 }

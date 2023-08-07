@@ -75,7 +75,6 @@ func (kc *Kubeclient) SpawnNewWorkload(job *StressJob) error {
 
 	resultingJob, err := kc.BatchV1().Jobs(kc.ns).Create(context.TODO(), k8sJob, metav1.CreateOptions{})
 	if err != nil {
-		fmt.Println(err.Error())
 		kc.logger.Error("Error from K8s API when creating Job resource", zap.Error(err))
 		return err
 	}
@@ -189,6 +188,29 @@ func (kc *Kubeclient) GetPodNodeName(podName string) (string, error) {
 		return "", err
 	}
 	return pod.Spec.NodeName, nil
+}
+
+// PercentageToResourceQuantity converts a percentage to a resource.Quantity taking into account
+// the number of CPU cores on the machine
+func PercentageToResourceQuantity(cpuCounts map[string]int, percentage float64, nodeName string) (resource.Quantity, error) {
+	cpuCount := cpuCounts[nodeName]
+	// Map percentage to range 0-num_cpus
+	percentage = (percentage / 100) * float64(cpuCount)
+	return *resource.NewMilliQuantity(int64(percentage*1000), "DecimalSI"), nil
+}
+
+func ResourceQuantityToPercentage(cpuCounts map[string]int, quantity resource.Quantity, nodeName string) (float64, error) {
+	// TODO: Eventually get rid of this (when CPU counts will be heterogeneous)
+	if nodeName == "" {
+		for k, _ := range cpuCounts {
+			nodeName = k
+			break
+		}
+	}
+	cpuCount := cpuCounts[nodeName]
+	// Map quantity to range 0-num_cpus
+	percentage := (float64(quantity.MilliValue()) / 1000) / float64(cpuCount)
+	return percentage * 100, nil
 }
 
 func isOwnerPresent(ownerRefs []metav1.OwnerReference, ownerName string, kind string) bool {
