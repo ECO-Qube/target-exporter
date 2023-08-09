@@ -310,6 +310,11 @@ func (t *TargetExporter) putSelfDriving(g *gin.Context) {
 		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if t.o.IsInFlight() {
+		g.JSON(http.StatusServiceUnavailable, gin.H{"error": "cannot enable self driving when another request is in flight"})
+		return
+	}
+
 	if payload.Enabled {
 		t.o.StartSelfDriving()
 	} else {
