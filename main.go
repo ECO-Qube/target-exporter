@@ -166,7 +166,7 @@ func init() {
 	initMetricsServer()
 	initPromClient()
 
-	api = NewTargetExporter(metricsSrv, bootCfg, isCorsDisabled, logger, orchestrator)
+	api = NewTargetExporter(promclient, kubeclient, metricsSrv, bootCfg, isCorsDisabled, logger)
 }
 
 func main() {
@@ -176,6 +176,7 @@ func main() {
 	api.StartMetrics()
 	api.StartApi()
 	initOrchestrator()
+	api.SetOrchestrator(orchestrator)
 
 	// Listen for the interrupt signal from the OS
 	<-ctx.Done()

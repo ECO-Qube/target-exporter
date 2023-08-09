@@ -25,11 +25,12 @@ type SelfDriving struct {
 	mu          sync.Mutex
 }
 
-func NewSelfDriving(kubeClient *kubeclient.Kubeclient, promClient *promclient.Promclient, logger *zap.Logger) *SelfDriving {
+func NewSelfDriving(kubeClient *kubeclient.Kubeclient, promClient *promclient.Promclient, logger *zap.Logger, targets map[string]*Target) *SelfDriving {
 	return &SelfDriving{
 		kubeClient: kubeClient,
 		promClient: promClient,
 		logger:     logger,
+		targets:    targets,
 
 		startStop:   make(chan string),
 		initialized: false,
@@ -78,10 +79,10 @@ func (s *SelfDriving) run() {
 				s.logger.Debug("selfdriving startStop channel empty, continuing")
 			}
 			if run {
-				//err := s.Reconcile()
-				//if err != nil {
-				//	s.logger.Error("error while reconciling", zap.Error(err))
-				//}
+				err := s.Reconcile()
+				if err != nil {
+					s.logger.Error("error while reconciling", zap.Error(err))
+				}
 			}
 			time.Sleep(2 * time.Second)
 		}

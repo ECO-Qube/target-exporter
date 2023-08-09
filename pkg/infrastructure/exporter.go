@@ -3,6 +3,8 @@ package infrastructure
 import (
 	"errors"
 	"fmt"
+	"git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
+	"git.helio.dev/eco-qube/target-exporter/pkg/promclient"
 	. "git.helio.dev/eco-qube/target-exporter/pkg/scheduling"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -24,20 +26,23 @@ type TargetExporter struct {
 	bootCfg      Config
 	corsDisabled bool
 	logger       *zap.Logger
-	o            *Orchestrator
+	promClient   *promclient.Promclient
+	kubeClient   *kubeclient.Kubeclient
 
+	o           *Orchestrator
 	apiSrv      *http.Server
 	targets     map[string]*Target
 	schedulable map[string]*Schedulable
 }
 
-func NewTargetExporter(metricsSrv *http.Server, bootCfg Config, corsDisabled bool, logger *zap.Logger, o *Orchestrator) *TargetExporter {
+func NewTargetExporter(promClient *promclient.Promclient, kubeClient *kubeclient.Kubeclient, metricsSrv *http.Server, bootCfg Config, corsDisabled bool, logger *zap.Logger) *TargetExporter {
 	return &TargetExporter{
+		promClient:   promClient,
+		kubeClient:   kubeClient,
 		metricsSrv:   metricsSrv,
 		bootCfg:      bootCfg,
 		corsDisabled: corsDisabled,
 		logger:       logger,
-		o:            o,
 		targets:      make(map[string]*Target), // basic cache for the targets, source of truth is in Prometheus TSDB
 		schedulable:  make(map[string]*Schedulable),
 	}
@@ -93,6 +98,10 @@ func (t *TargetExporter) GetApiServer() *http.Server {
 
 func (t *TargetExporter) GetMetricsServer() *http.Server {
 	return t.metricsSrv
+}
+
+func (t *TargetExporter) SetOrchestrator(o *Orchestrator) {
+	t.o = o
 }
 
 // Helper function to find missing nodes from one map where key is node name, and a map of node names to *Target.

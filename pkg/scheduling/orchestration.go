@@ -46,8 +46,7 @@ type Orchestrator struct {
 
 func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, logger *zap.Logger, targets map[string]*Target,
 	schedulable map[string]*Schedulable) *Orchestrator {
-	selfDriving := NewSelfDriving(kubeClient, promClient, logger)
-	selfDriving.Start()
+	selfDriving := NewSelfDriving(kubeClient, promClient, logger, targets)
 
 	schedulableStrategy := NewSchedulableStrategy(kubeClient, promClient, logger, targets, schedulable)
 	schedulableStrategy.Start()
@@ -60,33 +59,10 @@ func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, logger *zap
 	}
 }
 
-func (o *Orchestrator) GetPromClient() *Promclient {
-	return o.promClient
+func (o *Orchestrator) StartSelfDriving() {
+	o.selfDriving.Start()
 }
 
-func (o *Orchestrator) GetKubeClient() *Kubeclient {
-	return o.kubeClient
+func (o *Orchestrator) StopSelfDriving() {
+	o.selfDriving.Stop()
 }
-
-//func (t *Orchestrator) Targets() map[string]*Target {
-//	return t.targets
-//}
-//
-//func (t *Orchestrator) GetApiServer() *http.Server {
-//	return t.apiSrv
-//}
-//
-//func (t *Orchestrator) GetMetricsServer() *http.Server {
-//	return t.metricsSrv
-//}
-//
-///************* HELPER FUNCTIONS *************/
-//
-//func (t *Orchestrator) findSchedulableNode() string {
-//	for k, v := range t.Schedulable {
-//		if v.Schedulable {
-//			return k
-//		}
-//	}
-//	return ""
-//}

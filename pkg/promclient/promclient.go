@@ -69,7 +69,6 @@ func NewPromClient(client v1.API, logger *zap.Logger) *Promclient {
 //
 // ]
 func (p *Promclient) GetCpuUsageByRangeSeconds(start time.Time, end time.Time) ([]NodeCpuUsage, error) {
-
 	r := v1.Range{
 		Start: start,
 		End:   end.Add(-time.Second), // Make last second non-inclusive

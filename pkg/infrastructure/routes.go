@@ -80,7 +80,7 @@ func (t *TargetExporter) StartApi() {
 		v1.GET("/actualCpuDiff", t.getCurrentCpuDiff)
 
 		// TODO: Fix
-		//v1.PUT("/self-driving", t.putSelfDriving)
+		v1.PUT("/self-driving", t.putSelfDriving)
 	}
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -99,17 +99,14 @@ func (t *TargetExporter) StartApi() {
 
 // TODO: Make configurable with namespace or label selector
 func (t *TargetExporter) getWorkloads(g *gin.Context) {
-	kubeClient := t.o.GetKubeClient()
-	promClient := t.o.GetPromClient()
-
-	pods, err := kubeClient.GetPodsInNamespace()
+	pods, err := t.kubeClient.GetPodsInNamespace()
 	if err != nil {
 		// TODO: More granular error handling
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	cpuCounts, err := promClient.GetCpuCounts()
+	cpuCounts, err := t.promClient.GetCpuCounts()
 	if err != nil {
 		t.logger.Error("failed to get cpu counts", zap.Error(err))
 		return
@@ -164,7 +161,7 @@ func (t *TargetExporter) postTargetsRequest(g *gin.Context) {
 // nothing was done but no error. If no error and something was deleted, "success" is returned
 // In all other cases, an error is returned
 func (t *TargetExporter) deleteWorkloadsCompleted(g *gin.Context) {
-	done, err := t.o.GetKubeClient().ClearCompletedWorkloads()
+	done, err := t.kubeClient.ClearCompletedWorkloads()
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -180,7 +177,7 @@ func (t *TargetExporter) deleteWorkloadsCompleted(g *gin.Context) {
 // nothing was done but no error. If no error and something was deleted, "success" is returned
 // In all other cases, an error is returned
 func (t *TargetExporter) deleteWorkloadsPendingLast(g *gin.Context) {
-	done, err := t.o.GetKubeClient().DeletePendingWorkload()
+	done, err := t.kubeClient.DeletePendingWorkload()
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -193,9 +190,6 @@ func (t *TargetExporter) deleteWorkloadsPendingLast(g *gin.Context) {
 }
 
 func (t *TargetExporter) postWorkloads(g *gin.Context) {
-	kubeClient := t.o.GetKubeClient()
-	promClient := t.o.GetPromClient()
-
 	// TODO: Note PodName can't be set by user yet
 	payload := WorkloadRequest{}
 	if err := g.BindJSON(&payload); err != nil {
@@ -210,7 +204,7 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 		dummy = k
 		break
 	}
-	cpuCounts, err := promClient.GetCpuCounts()
+	cpuCounts, err := t.promClient.GetCpuCounts()
 	if err != nil {
 		t.logger.Error("failed to get cpu counts", zap.Error(err))
 		return
@@ -228,7 +222,7 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 		Build()
 
 	// payload.CpuTarget, payload.CpuCount, time.Duration(payload.JobLength*int(time.Minute)), payload.WorkloadType
-	err = kubeClient.SpawnNewWorkload(job)
+	err = t.kubeClient.SpawnNewWorkload(job)
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -240,9 +234,6 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 }
 
 func (t *TargetExporter) patchWorkload(g *gin.Context) {
-	kubeClient := t.o.GetKubeClient()
-	promClient := t.o.GetPromClient()
-
 	// TODO: Currently only supports patching of CPU limits
 	payload := WorkloadRequest{}
 	if err := g.BindJSON(&payload); err != nil {
@@ -253,7 +244,7 @@ func (t *TargetExporter) patchWorkload(g *gin.Context) {
 		g.JSON(http.StatusBadRequest, gin.H{"error": "podName must be specified"})
 		return
 	}
-	nodeName, err := kubeClient.GetPodNodeName(payload.PodName)
+	nodeName, err := t.kubeClient.GetPodNodeName(payload.PodName)
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -262,7 +253,7 @@ func (t *TargetExporter) patchWorkload(g *gin.Context) {
 		g.JSON(http.StatusBadRequest, gin.H{"error": "cannot set CPU limit for a pod that is not in Running state"})
 		return
 	}
-	cpuCounts, err := promClient.GetCpuCounts()
+	cpuCounts, err := t.promClient.GetCpuCounts()
 	if err != nil {
 		t.logger.Error("failed to get cpu counts", zap.Error(err))
 		return
@@ -272,7 +263,7 @@ func (t *TargetExporter) patchWorkload(g *gin.Context) {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	err = kubeClient.PatchCpuLimit(cpuTarget, payload.PodName)
+	err = t.kubeClient.PatchCpuLimit(cpuTarget, payload.PodName)
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -293,7 +284,7 @@ func (t *TargetExporter) getCpuUsageByRangeSeconds(g *gin.Context) {
 		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	cpuUsagesPerNode, err := t.o.GetPromClient().GetCpuUsageByRangeSeconds(start, end)
+	cpuUsagesPerNode, err := t.promClient.GetCpuUsageByRangeSeconds(start, end)
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -303,7 +294,7 @@ func (t *TargetExporter) getCpuUsageByRangeSeconds(g *gin.Context) {
 }
 
 func (t *TargetExporter) getCurrentCpuDiff(g *gin.Context) {
-	cpuDiff, err := t.o.GetPromClient().GetCurrentCpuDiff()
+	cpuDiff, err := t.promClient.GetCurrentCpuDiff()
 	// TODO: Better error handling
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -313,26 +304,18 @@ func (t *TargetExporter) getCurrentCpuDiff(g *gin.Context) {
 }
 
 // TODO: Fix
-//func (t *TargetExporter) putSelfDriving(g *gin.Context) {
-//	payload := SelfDrivingRequest{}
-//	if err := g.BindJSON(&payload); err != nil {
-//		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-//		return
-//	}
-//	if payload.Enabled {
-//		err := t.selfDriving.Start()
-//		if err != nil {
-//			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-//			return
-//		}
-//	} else {
-//		err := t.selfDriving.Stop()
-//		if err != nil {
-//			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-//			return
-//		}
-//	}
-//	g.JSON(http.StatusOK, gin.H{
-//		"message": "success",
-//	})
-//}
+func (t *TargetExporter) putSelfDriving(g *gin.Context) {
+	payload := SelfDrivingRequest{}
+	if err := g.BindJSON(&payload); err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if payload.Enabled {
+		t.o.StartSelfDriving()
+	} else {
+		t.o.StopSelfDriving()
+	}
+	g.JSON(http.StatusOK, gin.H{
+		"message": "success",
+	})
+}
