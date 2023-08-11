@@ -67,6 +67,6 @@ func (o *Orchestrator) StopSelfDriving() {
 	o.selfDriving.Stop()
 }
 
-func (o *Orchestrator) IsInFlight() bool {
-	return o.selfDriving.InFlight
+func (o *Orchestrator) IsSelfDrivingEnabled() bool {
+	return o.selfDriving.IsRunning
 }

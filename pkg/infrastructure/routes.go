@@ -80,7 +80,9 @@ func (t *TargetExporter) StartApi() {
 		v1.GET("/actualCpuDiff", t.getCurrentCpuDiff)
 
 		// TODO: Fix
+		v1.GET("/self-driving", t.getSelfDriving)
 		v1.PUT("/self-driving", t.putSelfDriving)
+		v1.PUT("/test/self-driving", t.putTestSelfDriving)
 	}
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -303,15 +305,17 @@ func (t *TargetExporter) getCurrentCpuDiff(g *gin.Context) {
 	g.JSON(http.StatusOK, cpuDiff)
 }
 
+func (t *TargetExporter) getSelfDriving(g *gin.Context) {
+	g.JSON(http.StatusOK, gin.H{
+		"enabled": t.o.IsSelfDrivingEnabled(),
+	})
+}
+
 // TODO: Fix
 func (t *TargetExporter) putSelfDriving(g *gin.Context) {
 	payload := SelfDrivingRequest{}
 	if err := g.BindJSON(&payload); err != nil {
 		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if t.o.IsInFlight() {
-		g.JSON(http.StatusServiceUnavailable, gin.H{"error": "cannot enable self driving when another request is in flight"})
 		return
 	}
 

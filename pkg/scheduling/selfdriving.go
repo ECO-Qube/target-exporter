@@ -1,12 +1,11 @@
 package scheduling
 
 import (
-	"fmt"
 	"git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
 	"git.helio.dev/eco-qube/target-exporter/pkg/promclient"
 	"go.uber.org/zap"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/strings/slices"
 	"math"
 	"strings"
 	"sync"
@@ -18,7 +17,6 @@ const Stop = "stop"
 const AdjustmentSlack = 5
 
 type SelfDriving struct {
-	InFlight   bool
 	kubeClient *kubeclient.Kubeclient
 	promClient *promclient.Promclient
 	targets    map[string]*Target
@@ -27,6 +25,8 @@ type SelfDriving struct {
 	startStop   chan string
 	initialized bool
 	mu          sync.Mutex
+	skipForNow  []string
+	IsRunning   bool
 }
 
 func NewSelfDriving(kubeClient *kubeclient.Kubeclient, promClient *promclient.Promclient, logger *zap.Logger, targets map[string]*Target) *SelfDriving {
@@ -44,27 +44,22 @@ func NewSelfDriving(kubeClient *kubeclient.Kubeclient, promClient *promclient.Pr
 func (s *SelfDriving) Start() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.InFlight = true
 
-	fmt.Println("Starting controller")
-
+	s.logger.Debug("starting controller")
 	if !s.initialized {
 		s.initialized = true
 		s.run()
 	}
 	s.startStop <- Start
-	s.InFlight = false
 }
 
 func (s *SelfDriving) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.InFlight = true
 
-	fmt.Println("Stopping controller")
+	s.logger.Debug("stopping controller")
 
 	s.startStop <- Stop
-	s.InFlight = false
 }
 
 func (s *SelfDriving) run() {
@@ -76,15 +71,17 @@ func (s *SelfDriving) run() {
 				if ok {
 					if command == Start {
 						run = true
+						s.IsRunning = true
 					} else {
 						run = false
+						s.IsRunning = false
 					}
 				} else {
 					s.logger.Info("selfdriving startStop channel closed")
 					break
 				}
 			default:
-				s.logger.Debug("selfdriving startStop channel empty, continuing")
+				s.logger.Debug("selfdriving startStop channel empty, continuing", zap.Bool("run", run))
 			}
 			if run {
 				err := s.Reconcile()
@@ -92,7 +89,7 @@ func (s *SelfDriving) run() {
 					s.logger.Error("error while reconciling", zap.Error(err))
 				}
 			}
-			time.Sleep(10 * time.Second)
+			time.Sleep(1 * time.Second)
 		}
 	}()
 }
@@ -145,24 +142,18 @@ func (s *SelfDriving) Reconcile() error {
 			// For each pod p
 			for _, pod := range podsInAboveTargetNode {
 				// TODO: Fix this ugly hard-coded thing
-				if strings.Contains(pod.Name, "telemetry-aware-scheduling") {
+				if strings.Contains(pod.Name, "telemetry-aware-scheduling") ||
+					slices.Contains(s.skipForNow, pod.Name) {
 					continue
 				}
+				newCpuLimit := pod.Spec.Containers[0].Resources.Limits.Cpu().DeepCopy()
+				newCpuLimit.Sub(deltaQuantity)
+
 				// patch(delta, p)
-				s.logger.Debug("Patching pod", zap.String("podName", pod.Name),
-					zap.String("node", diff.NodeName),
-					zap.Float64("delta", delta),
-					zap.Any("deltaQuantity", deltaQuantity))
 				// TODO: What if there are more containers?
 				// TODO: What if CPU limit result is negative?
-				mystr := pod.Spec.Containers[0].Resources.Limits.Cpu().String()
-				s.logger.Debug("CPU limit before sub", zap.String("cpuLimit", mystr))
-				temp := pod.Spec.Containers[0].Resources.Limits.Cpu().Value() - deltaQuantity.MilliValue()
-				newCpuLimitQuantity := resource.NewMilliQuantity(temp, resource.DecimalSI)
-				mystr = pod.Spec.Containers[0].Resources.Limits.Cpu().String()
-				s.logger.Debug("CPU limit after sub", zap.String("cpuLimit", newCpuLimitQuantity.String()))
-				//newCpuLimitQuantity := pod.Spec.Containers[0].Resources.Limits.Cpu()
-				err := kubeClient.PatchCpuLimit(*newCpuLimitQuantity, pod.Name)
+				s.skipForNow = append(s.skipForNow, pod.Name)
+				err := kubeClient.PatchCpuLimit(newCpuLimit, pod.Name)
 				if err != nil {
 					return err
 				}

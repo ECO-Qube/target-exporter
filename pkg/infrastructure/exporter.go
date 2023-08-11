@@ -6,9 +6,11 @@ import (
 	"git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
 	"git.helio.dev/eco-qube/target-exporter/pkg/promclient"
 	. "git.helio.dev/eco-qube/target-exporter/pkg/scheduling"
+	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.uber.org/zap"
+	v1 "k8s.io/api/core/v1"
 	"net/http"
 )
 
@@ -102,6 +104,37 @@ func (t *TargetExporter) GetMetricsServer() *http.Server {
 
 func (t *TargetExporter) SetOrchestrator(o *Orchestrator) {
 	t.o = o
+}
+
+func (t *TargetExporter) putTestSelfDriving(context *gin.Context) {
+	pods, err := t.kubeClient.GetPodsInNamespace()
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	podsInAboveTargetNode := make([]v1.Pod, 0)
+	for _, pod := range pods.Items {
+		if pod.Spec.Containers[0].Name == "tasext" {
+			continue
+		}
+		podsInAboveTargetNode = append(podsInAboveTargetNode, pod)
+	}
+
+	cpuCounts, err := t.promClient.GetCpuCounts()
+	if err != nil {
+		t.logger.Error("failed to get cpu counts", zap.Error(err))
+		return
+	}
+
+	//t.logger.Debug("debug", zap.Object("pods", podsInAboveTargetNode[0].Spec/))
+	newCpuLimit := podsInAboveTargetNode[1].Spec.Containers[0].Resources.Limits.Cpu().DeepCopy()
+	t.logger.Debug("debug", zap.String("cpu", newCpuLimit.String()))
+	ptrq, err := kubeclient.PercentageToResourceQuantity(cpuCounts, 10, podsInAboveTargetNode[1].Spec.NodeName)
+	if err != nil {
+		t.logger.Error("failed to get cpu counts", zap.Error(err))
+		return
+	}
+	t.logger.Debug("ptrq", zap.Any("ptrq", ptrq))
 }
 
 // Helper function to find missing nodes from one map where key is node name, and a map of node names to *Target.
