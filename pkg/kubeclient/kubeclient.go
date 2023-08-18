@@ -190,6 +190,16 @@ func (kc *Kubeclient) GetPodNodeName(podName string) (string, error) {
 	return pod.Spec.NodeName, nil
 }
 
+// TODO: Assuming pod name is unique...
+func (kc *Kubeclient) GetPodFromName(name string) (*v1.Pod, error) {
+	pod, err := kc.CoreV1().Pods(kc.ns).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		kc.logger.Error("Error getting Job", zap.Error(err))
+		return nil, err
+	}
+	return pod, nil
+}
+
 // PercentageToResourceQuantity converts a percentage to a resource.Quantity taking into account
 // the number of CPU cores on the machine
 func PercentageToResourceQuantity(cpuCounts map[string]int, percentage float64, nodeName string) (resource.Quantity, error) {
