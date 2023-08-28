@@ -46,6 +46,10 @@ type SelfDrivingRequest struct {
 	Enabled bool `json:"enabled"`
 }
 
+type TawaRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
 func (t *TargetExporter) StartApi() {
 	// Setup routes
 	r := gin.Default()
@@ -79,10 +83,8 @@ func (t *TargetExporter) StartApi() {
 		v1.GET("/actualCpuUsageByRangeSeconds", t.getCpuUsageByRangeSeconds)
 		v1.GET("/actualCpuDiff", t.getCurrentCpuDiff)
 
-		// TODO: Fix
 		v1.GET("/self-driving", t.getSelfDriving)
 		v1.PUT("/self-driving", t.putSelfDriving)
-		v1.PUT("/test/self-driving", t.putTestSelfDriving)
 	}
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -311,7 +313,6 @@ func (t *TargetExporter) getSelfDriving(g *gin.Context) {
 	})
 }
 
-// TODO: Fix
 func (t *TargetExporter) putSelfDriving(g *gin.Context) {
 	payload := SelfDrivingRequest{}
 	if err := g.BindJSON(&payload); err != nil {
@@ -323,6 +324,29 @@ func (t *TargetExporter) putSelfDriving(g *gin.Context) {
 		t.o.StartSelfDriving()
 	} else {
 		t.o.StopSelfDriving()
+	}
+	g.JSON(http.StatusOK, gin.H{
+		"message": "success",
+	})
+}
+
+func (t *TargetExporter) getTawa(g *gin.Context) {
+	g.JSON(http.StatusOK, gin.H{
+		"enabled": t.o.IsTawaEnabled(),
+	})
+}
+
+func (t *TargetExporter) putTawa(g *gin.Context) {
+	payload := TawaRequest{}
+	if err := g.BindJSON(&payload); err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if payload.Enabled {
+		t.o.StartTawa()
+	} else {
+		t.o.StopTawa()
 	}
 	g.JSON(http.StatusOK, gin.H{
 		"message": "success",

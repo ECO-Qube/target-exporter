@@ -26,7 +26,7 @@ type SkipItem struct {
 
 type SkipList []SkipItem
 
-type SelfDriving struct {
+type SelfDrivingStrategy struct {
 	kubeClient *kubeclient.Kubeclient
 	promClient *promclient.Promclient
 	targets    map[string]*Target
@@ -39,8 +39,8 @@ type SelfDriving struct {
 	IsRunning   bool
 }
 
-func NewSelfDriving(kubeClient *kubeclient.Kubeclient, promClient *promclient.Promclient, logger *zap.Logger, targets map[string]*Target) *SelfDriving {
-	return &SelfDriving{
+func NewSelfDrivingStrategy(kubeClient *kubeclient.Kubeclient, promClient *promclient.Promclient, logger *zap.Logger, targets map[string]*Target) *SelfDrivingStrategy {
+	return &SelfDrivingStrategy{
 		kubeClient: kubeClient,
 		promClient: promClient,
 		logger:     logger,
@@ -51,7 +51,7 @@ func NewSelfDriving(kubeClient *kubeclient.Kubeclient, promClient *promclient.Pr
 	}
 }
 
-func (s *SelfDriving) Start() {
+func (s *SelfDrivingStrategy) Start() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -63,7 +63,7 @@ func (s *SelfDriving) Start() {
 	s.startStop <- Start
 }
 
-func (s *SelfDriving) Stop() {
+func (s *SelfDrivingStrategy) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -72,7 +72,7 @@ func (s *SelfDriving) Stop() {
 	s.startStop <- Stop
 }
 
-func (s *SelfDriving) run() {
+func (s *SelfDrivingStrategy) run() {
 	go func() {
 		run := false
 		for {
@@ -105,7 +105,7 @@ func (s *SelfDriving) run() {
 }
 
 // See https://www.notion.so/e6e3f42774a54824acdacf2bfc1811e4?v=2555eddf50e54d8e87e367fd6feb8f43&p=e3be92a033fe417ebf9560f298c3297f&pm=c
-func (s *SelfDriving) Reconcile() error {
+func (s *SelfDrivingStrategy) Reconcile() error {
 	// Get current cpu diffs
 	promClient := s.promClient
 	kubeClient := s.kubeClient

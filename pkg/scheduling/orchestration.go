@@ -40,13 +40,14 @@ type Orchestrator struct {
 	promClient  *Promclient
 	kubeClient  *Kubeclient
 	logger      *zap.Logger
-	selfDriving *SelfDriving
+	selfDriving *SelfDrivingStrategy
 	schedulable *SchedulableStrategy
+	tawa        *TawaStrategy
 }
 
 func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, logger *zap.Logger, targets map[string]*Target,
 	schedulable map[string]*Schedulable) *Orchestrator {
-	selfDriving := NewSelfDriving(kubeClient, promClient, logger, targets)
+	selfDriving := NewSelfDrivingStrategy(kubeClient, promClient, logger, targets)
 
 	schedulableStrategy := NewSchedulableStrategy(kubeClient, promClient, logger, targets, schedulable)
 	schedulableStrategy.Start()
@@ -70,3 +71,27 @@ func (o *Orchestrator) StopSelfDriving() {
 func (o *Orchestrator) IsSelfDrivingEnabled() bool {
 	return o.selfDriving.IsRunning
 }
+
+func (o *Orchestrator) StartTawa() {
+	o.tawa.Enable()
+}
+
+func (o *Orchestrator) StopTawa() {
+	o.tawa.Disable()
+}
+
+func (o *Orchestrator) IsTawaEnabled() bool {
+	return o.tawa.IsEnabled
+}
+
+//func (o *Orchestrator) StartTawaStrategy() {
+//	return o.tawa.IsActivated
+//}
+//
+//func (o *Orchestrator) StopTawaStrategy() {
+//
+//}
+//
+//func (0 * Orchestrator) Schedule() bool {
+//	return o.tawa.IsActivated
+//}

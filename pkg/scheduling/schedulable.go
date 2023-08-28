@@ -75,6 +75,13 @@ func (t *SchedulableStrategy) Start() {
 	}()
 }
 
+func (t *SchedulableStrategy) Stop() {
+	// Set all targets to 1
+	for _, v := range t.schedulable {
+		v.Set(true)
+	}
+}
+
 // TODO: Remove duplicate in orchestration.go
 func (t *SchedulableStrategy) findSchedulableNode() string {
 	for k, v := range t.schedulable {
