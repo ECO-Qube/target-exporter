@@ -8,12 +8,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"math"
 	"strings"
-	"sync"
 	"time"
 )
 
-const Start = "start"
-const Stop = "stop"
 const AdjustmentSlack = 5
 const TimeSinceInsertionThreshold = 1 * time.Minute
 const TimeSinceSchedulingThreshold = 1 * time.Minute
@@ -27,81 +24,23 @@ type SkipItem struct {
 type SkipList []SkipItem
 
 type SelfDrivingStrategy struct {
+	BaseConcurrentStrategy
+
 	kubeClient *kubeclient.Kubeclient
 	promClient *promclient.Promclient
 	targets    map[string]*Target
-
-	logger      *zap.Logger
-	startStop   chan string
-	initialized bool
-	mu          sync.Mutex
-	skipForNow  SkipList
-	IsRunning   bool
+	skipForNow SkipList
 }
 
 func NewSelfDrivingStrategy(kubeClient *kubeclient.Kubeclient, promClient *promclient.Promclient, logger *zap.Logger, targets map[string]*Target) *SelfDrivingStrategy {
-	return &SelfDrivingStrategy{
+	strategy := &SelfDrivingStrategy{
 		kubeClient: kubeClient,
 		promClient: promClient,
-		logger:     logger,
 		targets:    targets,
-
-		startStop:   make(chan string),
-		initialized: false,
+		skipForNow: make(SkipList, 0),
 	}
-}
-
-func (s *SelfDrivingStrategy) Start() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.logger.Debug("starting controller")
-	if !s.initialized {
-		s.initialized = true
-		s.run()
-	}
-	s.startStop <- Start
-}
-
-func (s *SelfDrivingStrategy) Stop() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.logger.Debug("stopping controller")
-
-	s.startStop <- Stop
-}
-
-func (s *SelfDrivingStrategy) run() {
-	go func() {
-		run := false
-		for {
-			select {
-			case command, ok := <-s.startStop:
-				if ok {
-					if command == Start {
-						run = true
-						s.IsRunning = true
-					} else {
-						run = false
-						s.IsRunning = false
-					}
-				} else {
-					s.logger.Info("selfdriving startStop channel closed")
-					break
-				}
-			default:
-				s.logger.Debug("selfdriving startStop channel empty, continuing", zap.Bool("run", run))
-			}
-			if run {
-				err := s.Reconcile()
-				if err != nil {
-					s.logger.Error("error while reconciling", zap.Error(err))
-				}
-			}
-			time.Sleep(1 * time.Second)
-		}
-	}()
+	strategy.BaseConcurrentStrategy = NewBaseConcurrentStrategy("selfDriving", strategy.Reconcile, logger.With(zap.String("strategy", "selfDriving")))
+	return strategy
 }
 
 // See https://www.notion.so/e6e3f42774a54824acdacf2bfc1811e4?v=2555eddf50e54d8e87e367fd6feb8f43&p=e3be92a033fe417ebf9560f298c3297f&pm=c

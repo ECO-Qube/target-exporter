@@ -69,19 +69,25 @@ func (o *Orchestrator) StopSelfDriving() {
 }
 
 func (o *Orchestrator) IsSelfDrivingEnabled() bool {
-	return o.selfDriving.IsRunning
+	return o.selfDriving.IsRunning()
 }
 
 func (o *Orchestrator) StartTawa() {
-	o.tawa.Enable()
+	o.tawa.Start()
 }
 
 func (o *Orchestrator) StopTawa() {
-	o.tawa.Disable()
+	o.tawa.Stop()
 }
 
 func (o *Orchestrator) IsTawaEnabled() bool {
-	return o.tawa.IsEnabled
+	return o.tawa.IsRunning()
+}
+
+func (o *Orchestrator) AddWorkload() {
+	// TODO: Extract postWorkload login in here, check if TAWA strategy is enabled and schedule accordingly based on the
+	// return value of pyZHM endpoint, create TAWA endpoint
+	// TODO: Job queue, for now, don't keep a queue
 }
 
 //func (o *Orchestrator) StartTawaStrategy() {
