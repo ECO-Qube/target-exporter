@@ -28,8 +28,8 @@ type BaseConcurrentStrategy struct {
 	startStop   chan string
 }
 
-func NewBaseConcurrentStrategy(strategyName string, reconcile func() error, logger *zap.Logger) BaseConcurrentStrategy {
-	return BaseConcurrentStrategy{
+func NewBaseConcurrentStrategy(strategyName string, reconcile func() error, logger *zap.Logger) *BaseConcurrentStrategy {
+	return &BaseConcurrentStrategy{
 		strategyName: strategyName,
 		logger:       logger.With(zap.String("strategyName", strategyName)),
 		reconcile:    reconcile,
@@ -41,7 +41,7 @@ func NewBaseConcurrentStrategy(strategyName string, reconcile func() error, logg
 	}
 }
 
-func (c BaseConcurrentStrategy) Start() {
+func (c *BaseConcurrentStrategy) Start() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -53,7 +53,7 @@ func (c BaseConcurrentStrategy) Start() {
 	c.startStop <- Start
 }
 
-func (c BaseConcurrentStrategy) Stop() {
+func (c *BaseConcurrentStrategy) Stop() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -61,11 +61,11 @@ func (c BaseConcurrentStrategy) Stop() {
 	c.startStop <- Stop
 }
 
-func (c BaseConcurrentStrategy) IsRunning() bool {
+func (c *BaseConcurrentStrategy) IsRunning() bool {
 	return c.isRunning
 }
 
-func (c BaseConcurrentStrategy) run() {
+func (c *BaseConcurrentStrategy) run() {
 	go func() {
 		run := false
 		for {

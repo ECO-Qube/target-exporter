@@ -45,6 +45,8 @@ type Orchestrator struct {
 	tawa        *TawaStrategy
 }
 
+// NewOrchestrator initialized a new orchestrator for all scheduling strategies.
+// By default, the schedulableStrategy is ON, the selfDrivingStrategy is OFF and the tawaStrategy is OFF.
 func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, logger *zap.Logger, targets map[string]*Target,
 	schedulable map[string]*Schedulable) *Orchestrator {
 	selfDriving := NewSelfDrivingStrategy(kubeClient, promClient, logger, targets)
@@ -57,6 +59,7 @@ func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, logger *zap
 		logger:      logger,
 		selfDriving: selfDriving,
 		schedulable: schedulableStrategy,
+		tawa:        NewTawaStrategy(kubeClient, promClient, logger),
 	}
 }
 
@@ -70,6 +73,18 @@ func (o *Orchestrator) StopSelfDriving() {
 
 func (o *Orchestrator) IsSelfDrivingEnabled() bool {
 	return o.selfDriving.IsRunning()
+}
+
+func (o *Orchestrator) StartSchedulable() {
+	o.schedulable.Start()
+}
+
+func (o *Orchestrator) StopSchedulable() {
+	o.schedulable.Stop()
+}
+
+func (o *Orchestrator) IsSchedulableEnabled() bool {
+	return o.schedulable.IsRunning()
 }
 
 func (o *Orchestrator) StartTawa() {

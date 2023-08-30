@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
 	"git.helio.dev/eco-qube/target-exporter/pkg/promclient"
+	"git.helio.dev/eco-qube/target-exporter/pkg/pyzhm"
 	. "git.helio.dev/eco-qube/target-exporter/pkg/scheduling"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -28,6 +29,7 @@ type TargetExporter struct {
 	logger       *zap.Logger
 	promClient   *promclient.Promclient
 	kubeClient   *kubeclient.Kubeclient
+	pyzhmClient  *pyzhm.PyzhmClient
 
 	o           *Orchestrator
 	apiSrv      *http.Server
@@ -39,6 +41,7 @@ func NewTargetExporter(promClient *promclient.Promclient, kubeClient *kubeclient
 	return &TargetExporter{
 		promClient:   promClient,
 		kubeClient:   kubeClient,
+		pyzhmClient:  pyzhm.NewPyzhmClient(),
 		metricsSrv:   metricsSrv,
 		bootCfg:      bootCfg,
 		corsDisabled: corsDisabled,

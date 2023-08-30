@@ -42,12 +42,20 @@ type WorkloadRequest struct {
 	WorkloadType kubeclient.WorkloadType `json:"workloadType"`
 }
 
-type SelfDrivingRequest struct {
+type enabled struct {
 	Enabled bool `json:"enabled"`
 }
 
+type SelfDrivingRequest struct {
+	enabled
+}
+
+type SchedulableRequest struct {
+	enabled
+}
+
 type TawaRequest struct {
-	Enabled bool `json:"enabled"`
+	enabled
 }
 
 func (t *TargetExporter) StartApi() {
@@ -85,6 +93,12 @@ func (t *TargetExporter) StartApi() {
 
 		v1.GET("/self-driving", t.getSelfDriving)
 		v1.PUT("/self-driving", t.putSelfDriving)
+
+		v1.GET("/tawa", t.getTawa)
+		v1.PUT("/tawa", t.putTawa)
+
+		v1.GET("/schedulable", t.getSchedulable)
+		v1.PUT("/schedulable", t.putSchedulable)
 	}
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -218,12 +232,34 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	job, _ := builder.
+
+	jobBuilder := builder.
 		WithCpuCount(payload.CpuCount).
 		WithCpuLimit(cpuTarget).
 		WithLength(time.Duration(payload.JobLength * int(time.Minute))).
-		WithWorkloadType(payload.WorkloadType).
-		Build()
+		WithWorkloadType(payload.WorkloadType)
+
+	// If TAWA strategy is on, add nodeselector
+	if t.o.IsTawaEnabled() {
+		scenario, err := t.pyzhmClient.GetTestScenario()
+		if err != nil {
+			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// TODO: Pass CPU limit of incoming job to prediction
+		predictions, err := t.pyzhmClient.Predict(scenario)
+		if err != nil {
+			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		jobBuilder.WithNodeSelector(string(predictions.Assignments["job1"]))
+	}
+	job, err := jobBuilder.Build()
+	if err != nil {
+		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
 	// payload.CpuTarget, payload.CpuCount, time.Duration(payload.JobLength*int(time.Minute)), payload.WorkloadType
 	err = t.kubeClient.SpawnNewWorkload(job)
@@ -324,6 +360,29 @@ func (t *TargetExporter) putSelfDriving(g *gin.Context) {
 		t.o.StartSelfDriving()
 	} else {
 		t.o.StopSelfDriving()
+	}
+	g.JSON(http.StatusOK, gin.H{
+		"message": "success",
+	})
+}
+
+func (t *TargetExporter) getSchedulable(g *gin.Context) {
+	g.JSON(http.StatusOK, gin.H{
+		"enabled": t.o.IsSchedulableEnabled(),
+	})
+}
+
+func (t *TargetExporter) putSchedulable(g *gin.Context) {
+	payload := SchedulableRequest{}
+	if err := g.BindJSON(&payload); err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if payload.Enabled {
+		t.o.StartSchedulable()
+	} else {
+		t.o.StopSchedulable()
 	}
 	g.JSON(http.StatusOK, gin.H{
 		"message": "success",

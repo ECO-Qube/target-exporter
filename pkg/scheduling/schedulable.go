@@ -8,7 +8,7 @@ import (
 )
 
 type SchedulableStrategy struct {
-	BaseConcurrentStrategy
+	*BaseConcurrentStrategy
 
 	targets     map[string]*Target
 	schedulable map[string]*Schedulable

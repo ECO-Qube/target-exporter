@@ -67,6 +67,7 @@ type JobBuilder interface {
 	WithCpuCount(int) JobBuilder
 	WithWorkloadType(WorkloadType) JobBuilder
 	WithLength(time.Duration) JobBuilder
+	WithNodeSelector(string) JobBuilder
 	Build() (*StressJob, error)
 }
 
@@ -121,6 +122,11 @@ func (builder *StressJobBuilder) WithWorkloadType(workloadType WorkloadType) Job
 
 func (builder *StressJobBuilder) WithLength(length time.Duration) JobBuilder {
 	builder.job.length = length
+	return builder
+}
+
+func (builder *StressJobBuilder) WithNodeSelector(nodeName string) JobBuilder {
+	builder.job.k8sJob.Spec.Template.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": nodeName}
 	return builder
 }
 

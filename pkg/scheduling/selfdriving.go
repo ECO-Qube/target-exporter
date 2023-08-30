@@ -24,7 +24,7 @@ type SkipItem struct {
 type SkipList []SkipItem
 
 type SelfDrivingStrategy struct {
-	BaseConcurrentStrategy
+	*BaseConcurrentStrategy
 
 	kubeClient *kubeclient.Kubeclient
 	promClient *promclient.Promclient

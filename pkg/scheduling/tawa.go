@@ -7,7 +7,7 @@ import (
 )
 
 type TawaStrategy struct {
-	BaseConcurrentStrategy
+	*BaseConcurrentStrategy
 	kubeClient *kubeclient.Kubeclient
 	promClient *promclient.Promclient
 }
