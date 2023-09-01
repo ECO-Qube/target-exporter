@@ -6,6 +6,7 @@ import (
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 	"go.uber.org/zap"
+	"golang.org/x/net/context"
 	"strconv"
 	"strings"
 	"time"
@@ -155,6 +156,29 @@ func (p *Promclient) GetCurrentCpuDiff() ([]NodeCpuUsage, error) {
 
 	return cpuUsagesPerNode, nil
 
+}
+
+func (p *Promclient) GetCurrentEnergyConsumption() (map[string]float64, error) {
+	result, warnings, err := p.Query(context.Background(), "fake_energy_consumption", time.Now(), v1.WithTimeout(5*time.Second))
+	if err != nil {
+		return nil, err
+	}
+	if len(warnings) > 0 {
+		p.logger.Warn(fmt.Sprintf("Prometheus Warnings: %v\n", warnings))
+	}
+	currentEnergyCons := make(map[string]float64)
+	for _, entry := range result.(model.Vector) {
+		energyCons, err := strconv.ParseFloat(entry.Value.String(), 64)
+		if err != nil {
+			return nil, err
+		}
+		nodeLabel := string(model.LabelSet(entry.Metric)["node_label"])
+		currentEnergyCons[nodeLabel] = energyCons
+	}
+	//for _, entry := range result {
+	//	fmt.Println(entry)
+	//}
+	return currentEnergyCons, nil
 }
 
 func (p *Promclient) GetCpuCounts() (map[string]int, error) {

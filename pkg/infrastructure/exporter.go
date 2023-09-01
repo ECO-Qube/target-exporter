@@ -79,6 +79,42 @@ func (t *TargetExporter) StartMetrics() {
 		t.schedulable[nodeName] = &Schedulable{Schedulable: false, Gauge: currentGauge}
 	}
 
+	// TODO: Remove
+	// Set fake energy consumption
+	fakeEnergyCons := map[string]float64{
+		"L1":  163.47,
+		"L3":  207.79,
+		"L5":  144.51,
+		"L7":  202.62,
+		"L9":  187.44,
+		"L11": 195.54,
+		"L13": 208.63,
+		"L15": 165.79,
+		"L17": 179.72,
+		"L19": 150.8,
+		"L21": 193.27,
+		"L23": 188.43,
+		"R1":  73.1,
+		"R3":  69.0,
+		"R5":  134.96397857142858,
+		"R7":  140.82715714285715,
+		"R9":  134.96397857142858,
+		"R11": 69.0,
+		"R13": 69.0,
+		"R15": 152.55351428571427,
+		"R17": 69.0,
+		"R19": 69.0,
+		"R21": 69.0,
+		"R23": 69.0,
+	}
+
+	for label, energyCons := range fakeEnergyCons {
+		promauto.NewGauge(prometheus.GaugeOpts{
+			Name:        "fake_energy_consumption",
+			ConstLabels: map[string]string{"node_label": label},
+		}).Set(energyCons)
+	}
+
 	go func() {
 		t.logger.Info("Starting metrics server")
 		if err := t.metricsSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

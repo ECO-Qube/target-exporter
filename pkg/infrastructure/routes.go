@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
 	"git.helio.dev/eco-qube/target-exporter/pkg/middlewares"
+	"git.helio.dev/eco-qube/target-exporter/pkg/pyzhm"
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -239,15 +240,38 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 		WithLength(time.Duration(payload.JobLength * int(time.Minute))).
 		WithWorkloadType(payload.WorkloadType)
 
-	// If TAWA strategy is on, add nodeselector
+	// If TAWA strategy is on, add
+	// TODO: Check if scenario present in HTTP request, if yes, don't read from Prometheus
 	if t.o.IsTawaEnabled() {
-		scenario, err := t.pyzhmClient.GetTestScenario()
+		result, err := t.promClient.GetCurrentEnergyConsumption()
 		if err != nil {
 			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		// TODO: Pass CPU limit of incoming job to prediction
+		scenario := pyzhm.Scenario{
+			Scenario:     make(map[string]float64),
+			Requirements: make(map[string]float64),
+		}
+		// Map result to Scenario
+		for k, v := range result {
+			scenario.Scenario[k] = v
+		}
+
+		// TODO: Get CPU count from Prometheus
+		coreCount, err := kubeclient.PercentageToResourceQuantity(cpuCounts, float64(payload.CpuTarget), dummy)
+		if err != nil {
+			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		scenario.Requirements["job1"] = float64(coreCount.Value())
+
+		//scenario, err := t.pyzhmClient.GetTestScenario()
+		if err != nil {
+			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
 		predictions, err := t.pyzhmClient.Predict(scenario)
 		if err != nil {
 			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

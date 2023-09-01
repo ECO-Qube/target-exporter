@@ -55,8 +55,8 @@ type InstantPowerUsage struct {
 
 type Scenario struct {
 	// NodeLabel -> InstantPowerUsage
-	Scenario     map[NodeLabel]InstantPowerUsage `json:"scenario"`
-	Requirements map[string]float64              `json:"requirements"`
+	Scenario     map[string]float64 `json:"scenario"`
+	Requirements map[string]float64 `json:"requirements"`
 }
 
 type Predictions struct {
@@ -80,7 +80,7 @@ func (p *PyzhmClient) Predict(scenario Scenario) (Predictions, error) {
 		return Predictions{}, err
 	}
 	payloadReader := bytes.NewReader(payload)
-	resp, err := http.Post("http://localhost:5001/predict", "application/json", payloadReader)
+	resp, err := http.Post("http://pyzhm.pyzhm.svc.cluster.local:5001/predict", "application/json", payloadReader)
 	if err != nil {
 		p.logger.Error("failed to send post request to pyzhm", zap.Error(err))
 		return Predictions{}, err
