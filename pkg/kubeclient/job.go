@@ -76,6 +76,7 @@ type Job interface {
 	GetCpuLimit() resource.Quantity
 	GetCpuCount() int
 	GetWorkloadType() WorkloadType
+	GetNodeSelector() map[string]string
 	RenderK8sJob() (BaseJob, error)
 }
 
@@ -84,6 +85,7 @@ type BaseJob struct {
 	cpuLimit     resource.Quantity
 	cpuCount     int
 	workloadType WorkloadType
+	nodeSelector map[string]string
 	k8sJob       *v1batch.Job
 }
 
@@ -126,7 +128,7 @@ func (builder *StressJobBuilder) WithLength(length time.Duration) JobBuilder {
 }
 
 func (builder *StressJobBuilder) WithNodeSelector(nodeName string) JobBuilder {
-	builder.job.k8sJob.Spec.Template.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": nodeName}
+	builder.job.nodeSelector = map[string]string{"kubernetes.io/hostname": nodeName}
 	return builder
 }
 
@@ -177,9 +179,16 @@ func (s *StressJob) RenderK8sJob() (*v1batch.Job, error) {
 	job.Spec.Template.Spec.Containers[0].Env[0].Value = strconv.Itoa(s.cpuCount)
 	job.Spec.Template.Spec.Containers[0].Env[1].Name = "STRESS_SYSTEM_FOR"
 	job.Spec.Template.Spec.Containers[0].Env[1].Value = fmt.Sprintf("%.0fm", s.length.Minutes())
-	// TODO: What if NodeSelector was already populated?
+	if s.nodeSelector != nil {
+		job.Spec.Template.Spec.NodeSelector = s.nodeSelector
+	}
 	if workloadType := string(s.workloadType); strings.TrimSpace(workloadType) != "" {
-		job.Spec.Template.Spec.NodeSelector = map[string]string{WorkloadTypeAnnotation: workloadType}
+		// TODO: Needs quick testing
+		if job.Spec.Template.Spec.NodeSelector == nil {
+			job.Spec.Template.Spec.NodeSelector = map[string]string{WorkloadTypeAnnotation: workloadType}
+		} else {
+			job.Spec.Template.Spec.NodeSelector[WorkloadTypeAnnotation] = workloadType
+		}
 	}
 
 	return job, nil

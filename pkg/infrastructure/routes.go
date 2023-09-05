@@ -277,7 +277,7 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		jobBuilder.WithNodeSelector(string(predictions.Assignments["job1"]))
+		jobBuilder.WithNodeSelector(predictions.Assignments["job1"])
 	}
 	job, err := jobBuilder.Build()
 	if err != nil {

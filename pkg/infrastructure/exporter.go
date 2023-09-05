@@ -41,7 +41,7 @@ func NewTargetExporter(promClient *promclient.Promclient, kubeClient *kubeclient
 	return &TargetExporter{
 		promClient:   promClient,
 		kubeClient:   kubeClient,
-		pyzhmClient:  pyzhm.NewPyzhmClient(),
+		pyzhmClient:  pyzhm.NewPyzhmClient(logger),
 		metricsSrv:   metricsSrv,
 		bootCfg:      bootCfg,
 		corsDisabled: corsDisabled,
