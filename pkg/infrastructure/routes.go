@@ -41,6 +41,7 @@ type WorkloadRequest struct {
 	JobLength    int                     `json:"jobLength"`
 	CpuCount     int                     `json:"cpuCount"`
 	WorkloadType kubeclient.WorkloadType `json:"workloadType"`
+	Scenario     map[string]float64      `json:"scenario,omitempty"`
 }
 
 type enabled struct {
@@ -243,7 +244,12 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 	// If TAWA strategy is on, add
 	// TODO: Check if scenario present in HTTP request, if yes, don't read from Prometheus
 	if t.o.IsTawaEnabled() {
-		result, err := t.promClient.GetCurrentEnergyConsumption()
+		var currentEnergyConsumption map[string]float64
+		if payload.Scenario == nil {
+			currentEnergyConsumption, err = t.promClient.GetCurrentEnergyConsumption()
+		} else {
+			currentEnergyConsumption = payload.Scenario
+		}
 		if err != nil {
 			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -254,7 +260,7 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 			Requirements: make(map[string]float64),
 		}
 		// Map result to Scenario
-		for k, v := range result {
+		for k, v := range currentEnergyConsumption {
 			scenario.Scenario[k] = v
 		}
 
