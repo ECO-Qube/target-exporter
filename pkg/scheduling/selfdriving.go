@@ -49,8 +49,6 @@ func (s *SelfDrivingStrategy) Reconcile() error {
 	promClient := s.promClient
 	kubeClient := s.kubeClient
 
-	s.logger.Debug("reconciling")
-
 	diffs, err := promClient.GetCurrentCpuDiff()
 	if err != nil {
 		return err
@@ -58,7 +56,8 @@ func (s *SelfDrivingStrategy) Reconcile() error {
 	// For each node n that has diff < -5
 	for _, diff := range diffs {
 		avgDiff := promclient.GetAvgInstantUsage(diff.Data)
-		if avgDiff < -AdjustmentSlack {
+		s.logger.Info("avgDiff", zap.Float64("avgDiff", avgDiff))
+		if isNodeAboveTarget(avgDiff) || isNodeBelowTarget(avgDiff) {
 			// Remove all items from skip where timeSinceInsertion > 2 minutes
 			// Remove also completed pods
 			pods, err := kubeClient.GetPodsInNamespace()
@@ -74,23 +73,23 @@ func (s *SelfDrivingStrategy) Reconcile() error {
 					return err
 				}
 				if timeSinceInsertion > TimeSinceInsertionThreshold || isPodCompleted(kubePod) {
-					s.logger.Debug("Removing item from skip list", zap.String("podName", s.skipForNow[i].PodName))
+					s.logger.Debug("removing item from skip list", zap.String("podName", s.skipForNow[i].PodName))
 					s.skipForNow = removeIndex(s.skipForNow, i)
 				}
 			}
-			s.logger.Debug("Node above Target", zap.String("node", diff.NodeName),
+			s.logger.Debug("Node violating Target", zap.String("node", diff.NodeName),
 				zap.Float64("target", s.targets[diff.NodeName].GetTarget()),
 				zap.Float64("usage", -promclient.GetAvgInstantUsage(diff.Data)))
 			// Get pods scheduled on n
-			podsInAboveTargetNode := make([]v1.Pod, 0)
+			podsInViolatingNode := make([]v1.Pod, 0)
 			for _, pod := range pods.Items {
 				if pod.Spec.NodeName == diff.NodeName {
-					podsInAboveTargetNode = append(podsInAboveTargetNode, pod)
+					podsInViolatingNode = append(podsInViolatingNode, pod)
 				}
 			}
 			// delta := diff(n) / len(pods(n))
 			absAvgDiff := math.Abs(avgDiff)
-			delta := absAvgDiff / float64(len(podsInAboveTargetNode))
+			delta := absAvgDiff / float64(len(podsInViolatingNode))
 			cpuCounts, err := promClient.GetCpuCounts()
 			if err != nil {
 				s.logger.Error("failed to get cpu counts", zap.Error(err))
@@ -101,7 +100,7 @@ func (s *SelfDrivingStrategy) Reconcile() error {
 				return err
 			}
 			// For each pod p
-			for _, pod := range podsInAboveTargetNode {
+			for _, pod := range podsInViolatingNode {
 				// TODO: Fix this ugly hard-coded thing
 				if strings.Contains(pod.Name, "telemetry-aware-scheduling") ||
 					s.skipForNow.containsPod(pod.Name) {
@@ -117,7 +116,11 @@ func (s *SelfDrivingStrategy) Reconcile() error {
 				}
 
 				newCpuLimit := pod.Spec.Containers[0].Resources.Limits.Cpu().DeepCopy()
-				newCpuLimit.Sub(deltaQuantity)
+				if isNodeAboveTarget(avgDiff) {
+					newCpuLimit.Sub(deltaQuantity)
+				} else if isNodeBelowTarget(avgDiff) {
+					newCpuLimit.Add(deltaQuantity)
+				}
 
 				// patch(delta, p)
 				// TODO: What if there are more containers?
@@ -187,4 +190,12 @@ func (s SkipList) isInsertedMoreThan(podName string, d time.Duration) bool {
 		}
 	}
 	return false
+}
+
+func isNodeAboveTarget(avgDiff float64) bool {
+	return avgDiff < -AdjustmentSlack
+}
+
+func isNodeBelowTarget(avgDiff float64) bool {
+	return avgDiff > AdjustmentSlack
 }
