@@ -62,7 +62,7 @@ type TawaRequest struct {
 
 func (t *TargetExporter) StartApi() {
 	// Setup routes
-	r := gin.Default()
+	r := gin.New()
 
 	// Setup logger
 
@@ -70,7 +70,7 @@ func (t *TargetExporter) StartApi() {
 	//   - Logs all requests, like a combined access and error log.
 	//   - Logs to stdout.
 	//   - RFC3339 with UTC time format.
-	r.Use(ginzap.Ginzap(t.logger, time.RFC3339, true))
+	//r.Use(ginzap.Ginzap(t.logger, time.RFC3339, true))
 
 	// Logs all panic to error log
 	//   - stack means whether output the stack info.

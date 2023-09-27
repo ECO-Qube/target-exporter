@@ -12,7 +12,8 @@ import (
 	"time"
 )
 
-const nodeCpuPromQuery = `100 - 100 * avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m]))`
+// const nodeCpuPromQuery = `100 - 100 * avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m]))`
+const nodeCpuPromQuery = `node_cpu_utilization`
 const nodeCpuCountQuery = `count without(cpu, mode) (node_cpu_seconds_total{mode="idle"})`
 const cpuDiffMetricName = "node_cpu_diff"
 
@@ -89,22 +90,17 @@ func (p *Promclient) GetCpuUsageByRangeSeconds(start time.Time, end time.Time) (
 	cpuUsagesPerNode := make([]NodeCpuUsage, 0)
 
 	for _, entry := range result.(model.Matrix) {
-		// Assume there is only one value per each node (hence Values[0])
 		instants := make([]InstantCpuUsage, 0)
 		for _, currentValue := range entry.Values {
+			usage := currentValue.Value
 			// Drop "fraction of second" from timestamp
 			ts, err := strconv.ParseInt(strings.Split(currentValue.Timestamp.String(), ".")[0], 10, 64)
 			if err != nil {
 				return nil, err
 			}
-			usage, err := strconv.ParseFloat(currentValue.Value.String(), 64)
-			if err != nil {
-				return nil, err
-			}
-
 			instants = append(instants, InstantCpuUsage{
 				Timestamp: time.Unix(ts, 0),
-				Usage:     usage,
+				Usage:     float64(usage),
 			})
 		}
 		cpuUsagesPerNode = append(cpuUsagesPerNode, NodeCpuUsage{

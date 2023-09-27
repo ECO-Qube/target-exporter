@@ -43,7 +43,7 @@ func (t *SchedulableStrategy) Reconcile() error {
 		t.logger.Error(fmt.Sprintf("error getting cpu diff: %s", err))
 	}
 	if schedulableNode := t.findSchedulableNode(); schedulableNode == "" {
-		t.logger.Debug("no Schedulable node found")
+		//t.logger.Debug("no schedulable node found")
 		// All nodes are not Schedulable, pick one with diff > 0
 		for _, v := range diffs {
 			if v.Data[0].Usage > 0 {
@@ -53,7 +53,7 @@ func (t *SchedulableStrategy) Reconcile() error {
 			}
 		}
 	} else {
-		t.logger.Debug("Schedulable node found :tada:")
+		//t.logger.Debug("schedulable node found :tada:")
 		// If current Schedulable has exceeded Target (diff is negative) change Schedulable node, else continue
 		for _, currentDiff := range diffs {
 			if currentDiff.NodeName == schedulableNode && currentDiff.Data[0].Usage <= 0 {

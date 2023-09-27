@@ -84,7 +84,7 @@ func (c *BaseConcurrentStrategy) run() {
 					break
 				}
 			default:
-				c.logger.Debug("startStop channel empty, continuing", zap.Bool("run", run))
+				//c.logger.Debug("startStop channel empty, continuing", zap.Bool("run", run))
 			}
 			if run {
 				err := c.reconcile()

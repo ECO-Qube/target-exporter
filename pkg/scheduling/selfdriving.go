@@ -11,9 +11,9 @@ import (
 	"time"
 )
 
-const AdjustmentSlack = 5
+const AdjustmentSlack = 2
 const TimeSinceInsertionThreshold = 1 * time.Minute
-const TimeSinceSchedulingThreshold = 1 * time.Minute
+const TimeSinceSchedulingThreshold = 2 * time.Minute
 
 type SkipItem struct {
 	PodName       string
@@ -80,10 +80,10 @@ func (s *SelfDrivingStrategy) Reconcile() error {
 			s.logger.Debug("Node violating Target", zap.String("node", diff.NodeName),
 				zap.Float64("target", s.targets[diff.NodeName].GetTarget()),
 				zap.Float64("usage", -promclient.GetAvgInstantUsage(diff.Data)))
-			// Get pods scheduled on n
+			// Get pods scheduled on n and running
 			podsInViolatingNode := make([]v1.Pod, 0)
 			for _, pod := range pods.Items {
-				if pod.Spec.NodeName == diff.NodeName {
+				if pod.Spec.NodeName == diff.NodeName && pod.Status.Phase == v1.PodRunning {
 					podsInViolatingNode = append(podsInViolatingNode, pod)
 				}
 			}

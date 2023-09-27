@@ -167,6 +167,7 @@ func (s *StressJob) RenderK8sJob() (*v1batch.Job, error) {
 		return nil, err
 	}
 
+	deadline := int64(s.length.Seconds())
 	job.Name = s.name
 	// TODO: What if there are multiple containers?
 	job.ObjectMeta.Name = s.name
@@ -179,6 +180,9 @@ func (s *StressJob) RenderK8sJob() (*v1batch.Job, error) {
 	job.Spec.Template.Spec.Containers[0].Env[0].Value = strconv.Itoa(s.cpuCount)
 	job.Spec.Template.Spec.Containers[0].Env[1].Name = "STRESS_SYSTEM_FOR"
 	job.Spec.Template.Spec.Containers[0].Env[1].Value = fmt.Sprintf("%.0fm", s.length.Minutes())
+	// Ensure deadline
+	job.Spec.ActiveDeadlineSeconds = &deadline
+
 	if s.nodeSelector != nil {
 		job.Spec.Template.Spec.NodeSelector = s.nodeSelector
 	}
