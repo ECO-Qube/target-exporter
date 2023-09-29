@@ -60,6 +60,10 @@ type TawaRequest struct {
 	enabled
 }
 
+type AutomaticJobSpawnRequest struct {
+	enabled
+}
+
 func (t *TargetExporter) StartApi() {
 	// Setup routes
 	r := gin.New()
@@ -101,6 +105,9 @@ func (t *TargetExporter) StartApi() {
 
 		v1.GET("/schedulable", t.getSchedulable)
 		v1.PUT("/schedulable", t.putSchedulable)
+
+		v1.GET("/automatic-job-spawn", t.getAutomaticJobSpawn)
+		v1.PUT("/automatic-job-spawn", t.putAutomaticJobSpawn)
 	}
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -436,6 +443,29 @@ func (t *TargetExporter) putTawa(g *gin.Context) {
 		t.o.StartTawa()
 	} else {
 		t.o.StopTawa()
+	}
+	g.JSON(http.StatusOK, gin.H{
+		"message": "success",
+	})
+}
+
+func (t *TargetExporter) getAutomaticJobSpawn(g *gin.Context) {
+	g.JSON(http.StatusOK, gin.H{
+		"enabled": t.o.IsAutomaticJobSpawnEnabled(),
+	})
+}
+
+func (t *TargetExporter) putAutomaticJobSpawn(g *gin.Context) {
+	payload := AutomaticJobSpawnRequest{}
+	if err := g.BindJSON(&payload); err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if payload.Enabled {
+		t.o.StartAutomaticJobSpawn()
+	} else {
+		t.o.StopAutomaticJobSpawn()
 	}
 	g.JSON(http.StatusOK, gin.H{
 		"message": "success",

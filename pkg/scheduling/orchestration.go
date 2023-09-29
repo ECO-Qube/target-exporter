@@ -37,12 +37,13 @@ func (api *Schedulable) Set(schedulable bool) {
 
 // Orchestrator is responsible for initializing and coordinating the scheduling / optimization strategies.
 type Orchestrator struct {
-	promClient  *Promclient
-	kubeClient  *Kubeclient
-	logger      *zap.Logger
-	selfDriving *SelfDrivingStrategy
-	schedulable *SchedulableStrategy
-	tawa        *TawaStrategy
+	promClient        *Promclient
+	kubeClient        *Kubeclient
+	logger            *zap.Logger
+	selfDriving       *SelfDrivingStrategy
+	schedulable       *SchedulableStrategy
+	tawa              *TawaStrategy
+	automaticJobSpawn *AutomaticJobSpawn
 }
 
 // NewOrchestrator initialized a new orchestrator for all scheduling strategies.
@@ -51,12 +52,13 @@ func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, logger *zap
 	schedulableStrategy := NewSchedulableStrategy(kubeClient, promClient, logger, targets, schedulable)
 	schedulableStrategy.Start()
 	return &Orchestrator{
-		promClient:  promClient,
-		kubeClient:  kubeClient,
-		logger:      logger,
-		selfDriving: NewSelfDrivingStrategy(kubeClient, promClient, logger, targets),
-		schedulable: schedulableStrategy,
-		tawa:        NewTawaStrategy(kubeClient, promClient, logger),
+		promClient:        promClient,
+		kubeClient:        kubeClient,
+		logger:            logger,
+		selfDriving:       NewSelfDrivingStrategy(kubeClient, promClient, logger, targets),
+		schedulable:       schedulableStrategy,
+		tawa:              NewTawaStrategy(kubeClient, promClient, logger),
+		automaticJobSpawn: NewAutomaticJobSpawn(kubeClient, promClient, logger),
 	}
 }
 
@@ -102,14 +104,14 @@ func (o *Orchestrator) AddWorkload() {
 	// TODO: Job queue, for now, don't keep a queue
 }
 
-//func (o *Orchestrator) StartTawaStrategy() {
-//	return o.tawa.IsActivated
-//}
-//
-//func (o *Orchestrator) StopTawaStrategy() {
-//
-//}
-//
-//func (0 * Orchestrator) Schedule() bool {
-//	return o.tawa.IsActivated
-//}
+func (o *Orchestrator) StartAutomaticJobSpawn() {
+	o.automaticJobSpawn.Start()
+}
+
+func (o *Orchestrator) StopAutomaticJobSpawn() {
+	o.automaticJobSpawn.Stop()
+}
+
+func (o *Orchestrator) IsAutomaticJobSpawnEnabled() bool {
+	return o.automaticJobSpawn.IsRunning()
+}
