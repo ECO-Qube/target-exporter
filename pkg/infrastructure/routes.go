@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
 	"git.helio.dev/eco-qube/target-exporter/pkg/middlewares"
+	"git.helio.dev/eco-qube/target-exporter/pkg/scheduling"
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -223,7 +224,15 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 		return
 	}
 
-	if err := t.o.AddWorkload(); err != nil {
+	opts := []scheduling.WorkloadSpawnOption{
+		scheduling.CpuTarget(payload.CpuTarget),
+		scheduling.JobLength(payload.JobLength),
+		scheduling.CpuCount(payload.CpuCount),
+		scheduling.WorkloadType(string(payload.WorkloadType)),
+		scheduling.WorkingScenario(payload.Scenario),
+	}
+
+	if err := t.o.AddWorkload(opts...); err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -374,7 +383,7 @@ func (t *TargetExporter) putTawa(g *gin.Context) {
 
 func (t *TargetExporter) getAutomaticJobSpawn(g *gin.Context) {
 	g.JSON(http.StatusOK, gin.H{
-		"enabled": t.o.IsAutomaticJobSpawnEnabled(),
+		"enabled": t.automaticJobSpawn.IsAutomaticJobSpawnEnabled(),
 	})
 }
 
@@ -386,9 +395,9 @@ func (t *TargetExporter) putAutomaticJobSpawn(g *gin.Context) {
 	}
 
 	if payload.Enabled {
-		t.o.StartAutomaticJobSpawn()
+		t.automaticJobSpawn.Start()
 	} else {
-		t.o.StopAutomaticJobSpawn()
+		t.automaticJobSpawn.Stop()
 	}
 	g.JSON(http.StatusOK, gin.H{
 		"message": "success",

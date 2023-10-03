@@ -10,21 +10,14 @@ import (
 )
 
 type WorkloadSpawnOptions struct {
-	PodName         string
 	CpuTarget       int
-	JobLength       int
+	JobLength       int // in minutes
 	CpuCount        int
 	WorkloadType    string
 	WorkingScenario map[string]float64
 }
 
 type WorkloadSpawnOption func(*WorkloadSpawnOptions)
-
-func PodName(name string) WorkloadSpawnOption {
-	return func(options *WorkloadSpawnOptions) {
-		options.PodName = name
-	}
-}
 
 func CpuTarget(target int) WorkloadSpawnOption {
 	return func(options *WorkloadSpawnOptions) {
@@ -86,15 +79,14 @@ func (api *Schedulable) Set(schedulable bool) {
 
 // Orchestrator is responsible for initializing and coordinating the scheduling / optimization strategies.
 type Orchestrator struct {
-	promClient        *Promclient
-	kubeClient        *Kubeclient
-	pyzhmClient       *PyzhmClient
-	selfDriving       *SelfDrivingStrategy
-	schedulable       *SchedulableStrategy
-	tawa              *TawaStrategy
-	automaticJobSpawn *AutomaticJobSpawn
-	targets           map[string]*Target
-	logger            *zap.Logger
+	promClient  *Promclient
+	kubeClient  *Kubeclient
+	pyzhmClient *PyzhmClient
+	selfDriving *SelfDrivingStrategy
+	schedulable *SchedulableStrategy
+	tawa        *TawaStrategy
+	targets     map[string]*Target
+	logger      *zap.Logger
 }
 
 // NewOrchestrator initialized a new orchestrator for all scheduling strategies.
@@ -103,15 +95,14 @@ func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, pyzhmClient
 	schedulableStrategy := NewSchedulableStrategy(kubeClient, promClient, logger, targets, schedulable)
 	schedulableStrategy.Start()
 	return &Orchestrator{
-		promClient:        promClient,
-		kubeClient:        kubeClient,
-		pyzhmClient:       pyzhmClient,
-		selfDriving:       NewSelfDrivingStrategy(kubeClient, promClient, logger, targets),
-		schedulable:       schedulableStrategy,
-		tawa:              NewTawaStrategy(kubeClient, promClient, logger),
-		automaticJobSpawn: NewAutomaticJobSpawn(kubeClient, promClient, logger),
-		targets:           targets,
-		logger:            logger,
+		promClient:  promClient,
+		kubeClient:  kubeClient,
+		pyzhmClient: pyzhmClient,
+		selfDriving: NewSelfDrivingStrategy(kubeClient, promClient, logger, targets),
+		schedulable: schedulableStrategy,
+		tawa:        NewTawaStrategy(kubeClient, promClient, logger),
+		targets:     targets,
+		logger:      logger,
 	}
 }
 
@@ -234,16 +225,4 @@ func (o *Orchestrator) AddWorkload(options ...WorkloadSpawnOption) error {
 		return err
 	}
 	return nil
-}
-
-func (o *Orchestrator) StartAutomaticJobSpawn() {
-	o.automaticJobSpawn.Start()
-}
-
-func (o *Orchestrator) StopAutomaticJobSpawn() {
-	o.automaticJobSpawn.Stop()
-}
-
-func (o *Orchestrator) IsAutomaticJobSpawnEnabled() bool {
-	return o.automaticJobSpawn.IsRunning()
 }

@@ -31,10 +31,11 @@ type TargetExporter struct {
 	kubeClient   *kubeclient.Kubeclient
 	pyzhmClient  *pyzhm.PyzhmClient
 
-	o           *Orchestrator
-	apiSrv      *http.Server
-	targets     map[string]*Target
-	schedulable map[string]*Schedulable
+	o                 *Orchestrator
+	automaticJobSpawn *AutomaticJobSpawn
+	apiSrv            *http.Server
+	targets           map[string]*Target
+	schedulable       map[string]*Schedulable
 }
 
 func NewTargetExporter(promClient *promclient.Promclient, kubeClient *kubeclient.Kubeclient, pyzhmClient *pyzhm.PyzhmClient, metricsSrv *http.Server, bootCfg Config, corsDisabled bool, logger *zap.Logger) *TargetExporter {
@@ -141,6 +142,10 @@ func (t *TargetExporter) GetMetricsServer() *http.Server {
 
 func (t *TargetExporter) SetOrchestrator(o *Orchestrator) {
 	t.o = o
+}
+
+func (t *TargetExporter) SetAutomaticJobSpawn(spawn *AutomaticJobSpawn) {
+	t.automaticJobSpawn = spawn
 }
 
 // Helper function to find missing nodes from one map where key is node name, and a map of node names to *Target.

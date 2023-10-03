@@ -199,6 +199,8 @@ func main() {
 	api.StartApi()
 	initOrchestrator()
 	api.SetOrchestrator(orchestrator)
+	automaticJobSpawn := NewAutomaticJobSpawn(orchestrator, kubeclient, promclient, logger)
+	api.SetAutomaticJobSpawn(automaticJobSpawn)
 
 	// Listen for the interrupt signal from the OS
 	<-ctx.Done()

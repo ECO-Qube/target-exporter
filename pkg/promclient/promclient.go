@@ -113,7 +113,7 @@ func (p *Promclient) GetCpuUsageByRangeSeconds(start time.Time, end time.Time) (
 }
 
 // GetCurrentCpuDiff returns the difference between the current CPU usage and the target CPU usage
-// for each node, based on the current time. It makes use of the "node_cpu_diff" metric.
+// for each node, based on the current time. It makes use of the "node_cpu_utilization" metric.
 func (p *Promclient) GetCurrentCpuDiff() ([]NodeCpuUsage, error) {
 	now := time.Now()
 	result, warnings, err := p.Query(ctx.Background(),
