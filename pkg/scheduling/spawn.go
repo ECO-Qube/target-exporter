@@ -1,7 +1,6 @@
 package scheduling
 
 import (
-	"fmt"
 	. "git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
 	. "git.helio.dev/eco-qube/target-exporter/pkg/promclient"
 	"go.uber.org/zap"
@@ -26,7 +25,7 @@ func NewAutomaticJobSpawn(kubeClient *Kubeclient, promClient *Promclient, logger
 }
 
 func (t *AutomaticJobSpawn) Reconcile() error {
-	fmt.Println("Spawning a job...")
+
 	return nil
 }
 

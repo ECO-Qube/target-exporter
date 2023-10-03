@@ -11,14 +11,14 @@ import (
 	"time"
 )
 
-type WorkloadType string
+type HardwareTarget string
 
-const WorkloadTypeAnnotation = "ecoqube.eu/wkld-type"
+const HardwareTypeAnnotation = "ecoqube.eu/hardware-type"
 
 const (
-	CpuIntensive     WorkloadType = "cpu"
-	StorageIntensive WorkloadType = "storage"
-	MemoryIntensive  WorkloadType = "memory"
+	CpuIntensive     HardwareTarget = "cpu"
+	StorageIntensive HardwareTarget = "storage"
+	MemoryIntensive  HardwareTarget = "memory"
 )
 
 const StressJobPrototype = `
@@ -65,7 +65,7 @@ type JobBuilder interface {
 	WithName(string) JobBuilder
 	WithCpuLimit(resource.Quantity) JobBuilder
 	WithCpuCount(int) JobBuilder
-	WithWorkloadType(WorkloadType) JobBuilder
+	WithWorkloadType(HardwareTarget) JobBuilder
 	WithLength(time.Duration) JobBuilder
 	WithNodeSelector(string) JobBuilder
 	Build() (*StressJob, error)
@@ -75,7 +75,7 @@ type Job interface {
 	GetName() string
 	GetCpuLimit() resource.Quantity
 	GetCpuCount() int
-	GetWorkloadType() WorkloadType
+	GetWorkloadType() HardwareTarget
 	GetNodeSelector() map[string]string
 	RenderK8sJob() (BaseJob, error)
 }
@@ -84,7 +84,7 @@ type BaseJob struct {
 	name         string
 	cpuLimit     resource.Quantity
 	cpuCount     int
-	workloadType WorkloadType
+	workloadType HardwareTarget
 	nodeSelector map[string]string
 	k8sJob       *v1batch.Job
 }
@@ -117,7 +117,7 @@ func (builder *StressJobBuilder) WithCpuCount(cpuCount int) JobBuilder {
 	return builder
 }
 
-func (builder *StressJobBuilder) WithWorkloadType(workloadType WorkloadType) JobBuilder {
+func (builder *StressJobBuilder) WithWorkloadType(workloadType HardwareTarget) JobBuilder {
 	builder.job.workloadType = workloadType
 	return builder
 }
@@ -156,7 +156,7 @@ func (s *StressJob) GetCpuCount() int {
 	return s.cpuCount
 }
 
-func (s *StressJob) GetWorkloadType() WorkloadType {
+func (s *StressJob) GetWorkloadType() HardwareTarget {
 	return s.workloadType
 }
 
@@ -189,9 +189,9 @@ func (s *StressJob) RenderK8sJob() (*v1batch.Job, error) {
 	if workloadType := string(s.workloadType); strings.TrimSpace(workloadType) != "" {
 		// TODO: Needs quick testing
 		if job.Spec.Template.Spec.NodeSelector == nil {
-			job.Spec.Template.Spec.NodeSelector = map[string]string{WorkloadTypeAnnotation: workloadType}
+			job.Spec.Template.Spec.NodeSelector = map[string]string{HardwareTypeAnnotation: workloadType}
 		} else {
-			job.Spec.Template.Spec.NodeSelector[WorkloadTypeAnnotation] = workloadType
+			job.Spec.Template.Spec.NodeSelector[HardwareTypeAnnotation] = workloadType
 		}
 	}
 

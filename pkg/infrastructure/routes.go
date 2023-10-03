@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"git.helio.dev/eco-qube/target-exporter/pkg/kubeclient"
 	"git.helio.dev/eco-qube/target-exporter/pkg/middlewares"
-	"git.helio.dev/eco-qube/target-exporter/pkg/pyzhm"
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -36,12 +35,12 @@ type WorkloadsList struct {
 }
 
 type WorkloadRequest struct {
-	PodName      string                  `json:"podName,omitempty"`
-	CpuTarget    int                     `json:"cpuTarget"`
-	JobLength    int                     `json:"jobLength"`
-	CpuCount     int                     `json:"cpuCount"`
-	WorkloadType kubeclient.WorkloadType `json:"workloadType"`
-	Scenario     map[string]float64      `json:"scenario,omitempty"`
+	PodName      string                    `json:"podName,omitempty"`
+	CpuTarget    int                       `json:"cpuTarget"`
+	JobLength    int                       `json:"jobLength"`
+	CpuCount     int                       `json:"cpuCount"`
+	WorkloadType kubeclient.HardwareTarget `json:"workloadType"`
+	Scenario     map[string]float64        `json:"scenario,omitempty"`
 }
 
 type enabled struct {
@@ -224,83 +223,7 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 		return
 	}
 
-	builder := kubeclient.NewConcreteStressJobBuilder()
-	// TODO: get node name dynamically https://www.notion.so/helioag/Map-input-percentage-of-cpu-limits-to-range-of-CPUs-for-node-c6bd901a457243d5afece2ae0a9ac150?pvs=4
-	var dummy string
-	for k, _ := range t.Targets() {
-		dummy = k
-		break
-	}
-	cpuCounts, err := t.promClient.GetCpuCounts()
-	if err != nil {
-		t.logger.Error("failed to get cpu counts", zap.Error(err))
-		return
-	}
-	cpuTarget, err := kubeclient.PercentageToResourceQuantity(cpuCounts, float64(payload.CpuTarget), dummy)
-	if err != nil {
-		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	jobBuilder := builder.
-		WithCpuCount(payload.CpuCount).
-		WithCpuLimit(cpuTarget).
-		WithLength(time.Duration(payload.JobLength * int(time.Minute))).
-		WithWorkloadType(payload.WorkloadType)
-
-	// If TAWA strategy is on, add
-	// TODO: Check if scenario present in HTTP request, if yes, don't read from Prometheus
-	if t.o.IsTawaEnabled() {
-		var currentEnergyConsumption map[string]float64
-		if payload.Scenario == nil {
-			currentEnergyConsumption, err = t.promClient.GetCurrentEnergyConsumption()
-		} else {
-			currentEnergyConsumption = payload.Scenario
-		}
-		if err != nil {
-			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		scenario := pyzhm.Scenario{
-			Scenario:     make(map[string]float64),
-			Requirements: make(map[string]float64),
-		}
-		// Map result to Scenario
-		for k, v := range currentEnergyConsumption {
-			scenario.Scenario[k] = v
-		}
-
-		// TODO: Get CPU count from Prometheus
-		coreCount, err := kubeclient.PercentageToResourceQuantity(cpuCounts, float64(payload.CpuTarget), dummy)
-		if err != nil {
-			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		scenario.Requirements["job1"] = float64(coreCount.Value())
-
-		//scenario, err := t.pyzhmClient.GetTestScenario()
-		if err != nil {
-			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		predictions, err := t.pyzhmClient.Predict(scenario)
-		if err != nil {
-			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		jobBuilder.WithNodeSelector(predictions.Assignments["job1"])
-	}
-	job, err := jobBuilder.Build()
-	if err != nil {
-		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// payload.CpuTarget, payload.CpuCount, time.Duration(payload.JobLength*int(time.Minute)), payload.WorkloadType
-	err = t.kubeClient.SpawnNewWorkload(job)
-	if err != nil {
+	if err := t.o.AddWorkload(); err != nil {
 		g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

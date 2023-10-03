@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"git.helio.dev/eco-qube/target-exporter/pkg/pyzhm"
 	. "git.helio.dev/eco-qube/target-exporter/pkg/scheduling"
 	promapi "github.com/prometheus/client_golang/api"
 	promapiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -36,6 +37,7 @@ var (
 	api          *TargetExporter
 	kubeclient   *Kubeclient
 	promclient   *Promclient
+	pyzhmClient  *pyzhm.PyzhmClient
 	metricsSrv   *http.Server
 	bootCfg      Config
 	logger       *zap.Logger
@@ -137,7 +139,14 @@ func initMetricsServer() {
 }
 
 func initOrchestrator() {
-	orchestrator = NewOrchestrator(kubeclient, promclient, logger, api.Targets(), api.Schedulable())
+	orchestrator = NewOrchestrator(
+		kubeclient,
+		promclient,
+		pyzhmClient,
+		logger,
+		api.Targets(),
+		api.Schedulable(),
+	)
 }
 
 // checkConfig checks if the config is valid, in particular it makes sure that the node names specified in the
@@ -165,8 +174,21 @@ func init() {
 
 	initMetricsServer()
 	initPromClient()
+	initPyzhmClient()
 
-	api = NewTargetExporter(promclient, kubeclient, metricsSrv, bootCfg, isCorsDisabled, logger)
+	api = NewTargetExporter(
+		promclient,
+		kubeclient,
+		pyzhmClient,
+		metricsSrv,
+		bootCfg,
+		isCorsDisabled,
+		logger,
+	)
+}
+
+func initPyzhmClient() {
+	pyzhmClient = pyzhm.NewPyzhmClient(logger)
 }
 
 func main() {

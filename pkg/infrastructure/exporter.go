@@ -37,11 +37,11 @@ type TargetExporter struct {
 	schedulable map[string]*Schedulable
 }
 
-func NewTargetExporter(promClient *promclient.Promclient, kubeClient *kubeclient.Kubeclient, metricsSrv *http.Server, bootCfg Config, corsDisabled bool, logger *zap.Logger) *TargetExporter {
+func NewTargetExporter(promClient *promclient.Promclient, kubeClient *kubeclient.Kubeclient, pyzhmClient *pyzhm.PyzhmClient, metricsSrv *http.Server, bootCfg Config, corsDisabled bool, logger *zap.Logger) *TargetExporter {
 	return &TargetExporter{
 		promClient:   promClient,
 		kubeClient:   kubeClient,
-		pyzhmClient:  pyzhm.NewPyzhmClient(logger),
+		pyzhmClient:  pyzhmClient,
 		metricsSrv:   metricsSrv,
 		bootCfg:      bootCfg,
 		corsDisabled: corsDisabled,
