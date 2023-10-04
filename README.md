@@ -99,19 +99,10 @@ https://prometheus.io/docs/instrumenting/writing_exporters/#target-labels-not-st
 ### Tilt Debugging
 
 - Note that in the Tiltfile the `--continue` option is passed to Delve which instructs the debugger to start the 
-process immediately. To instruct Tilt to not continue, remove the option from the tiltfile. TODO: Maybe make a custom
-button on target-exporter to toggle this behavior (i.e. click -> toggle to continue after restart, click again -> toggle
-to not continue after restart).
+process immediately. To instruct Tilt to not continue, remove the option from the tiltfile.
 
-## TODOs
+## EMPA deployment notes
 
-- [x] Prometheus doesn't have permission to scrape resources in namespaces different from its own (kube-prom-stack). It
-  would be better to place target-exporter into its own namespace and give Prometheus permission to scrape it.
-- [x] Create Helm chart
-- [x] Create a metric like `cpu-diff` and create a timeseries per each node with test values.
-- [x] Graceful shutdown
-- [x] Get and set targets through a REST API
-- [ ] Swap out plain Prometheus in TAS cluster for kube-prometheus-stack or just add the Prometheus Operator and deploy
-  service. Would be cool to then propose it as a PR to the TAS team.
-- [ ] Health and readiness checks
-- [ ] Leveled logging
+- Copy ecoqube-dev.kubeconfig over the charts file of target-exporter: `sudo cp /etc/kubernetes/admin.conf ecoqube-dev.kubeconfig`
+- `helm install target-exporter . --namespace target-exporter --create-namespace --values values-empa.yaml`
+- Note that some nodes could be tainted for easier testing

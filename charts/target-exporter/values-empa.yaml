@@ -8,7 +8,7 @@ image:
   repository: docker.io/cristianohelio/target-exporter
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "latest"
+  tag: "empa"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -26,7 +26,7 @@ serviceAccount:
 podAnnotations: {}
 
 podSecurityContext: {}
-  # fsGroup: 2000
+# fsGroup: 2000
 
 securityContext: {}
   # capabilities:
@@ -34,7 +34,7 @@ securityContext: {}
   #   - ALL
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
-  # runAsUser: 1000
+# runAsUser: 1000
 
 service:
   type: NodePort
@@ -51,7 +51,7 @@ resources: {}
   #   memory: 128Mi
   # requests:
   #   cpu: 100m
-  #   memory: 128Mi
+#   memory: 128Mi
 
 autoscaling:
   enabled: false
@@ -62,18 +62,51 @@ autoscaling:
 
 nodeSelector: {}
 
-tolerations: []
+# ! EMPA workaround ! label must be added to "headnode" node
+nodeName: "headnode"
+
+tolerations:
+  - key: "control-plane"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
 
 affinity: {}
+
+# ! EMPA workaround !
+hostNetwork: true
+# ! EMPA workaround !
+dnsPolicy: ClusterFirstWithHostNet
 
 # CLI args for target-exporter
 cliArgs: ["--cors-disabled=true",
           "--kubeconfig=/kubeconfig/ecoqube-dev.kubeconfig",
-          "--promclient-address=http://prom-service.monitoring.svc.cluster.local:9090"]
+          "--promclient-address=http://192.168.10.199:9090"]
 
 config:
   targetMetricName: "fake_energy_target"
-  targets: {}
-    #ecoqube-dev-default-worker-topo-62xvw-64766d695fxzpd6h-2s6z9: 20
-    #ecoqube-dev-default-worker-topo-62xvw-64766d695fxzpd6h-9tgpj: 30
-    #ecoqube-dev-default-worker-topo-62xvw-64766d695fxzpd6h-fb9f8: 50
+  targets:
+    node001: 42
+    node002: 75
+    node003: 18
+    node004: 91
+    node005: 6
+    node006: 37
+    node007: 54
+    node008: 82
+    node009: 11
+    node010: 68
+    node011: 30
+    node012: 63
+    node013: 50
+    node014: 22
+    node015: 95
+    node016: 4
+    node017: 87
+    node018: 13
+    node019: 71
+    node020: 46
+    node021: 59
+    node022: 78
+    node023: 26
+    node024: 99
