@@ -57,11 +57,6 @@ type Predictions struct {
 	Assignments map[string]string `json:"assignments"`
 }
 
-// ScenarioReader is an interface for reading scenarios from a CSV file.
-//type ScenarioReader interface {
-//	Read() ([]ScenarioPayload, error)
-//}
-
 func NewPyzhmClient(logger *zap.Logger) *PyzhmClient {
 	return &PyzhmClient{logger: logger}
 }

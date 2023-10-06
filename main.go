@@ -139,6 +139,7 @@ func initMetricsServer() {
 }
 
 func initOrchestrator() {
+	fmt.Println("yay", bootCfg.PyzhmNodeMappings)
 	orchestrator = NewOrchestrator(
 		kubeclient,
 		promclient,
@@ -146,6 +147,7 @@ func initOrchestrator() {
 		logger,
 		api.Targets(),
 		api.Schedulable(),
+		bootCfg.PyzhmNodeMappings,
 	)
 }
 

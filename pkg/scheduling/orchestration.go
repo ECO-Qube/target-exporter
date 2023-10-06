@@ -79,30 +79,33 @@ func (api *Schedulable) Set(schedulable bool) {
 
 // Orchestrator is responsible for initializing and coordinating the scheduling / optimization strategies.
 type Orchestrator struct {
-	promClient  *Promclient
-	kubeClient  *Kubeclient
-	pyzhmClient *PyzhmClient
-	selfDriving *SelfDrivingStrategy
-	schedulable *SchedulableStrategy
-	tawa        *TawaStrategy
-	targets     map[string]*Target
-	logger      *zap.Logger
+	promClient        *Promclient
+	kubeClient        *Kubeclient
+	pyzhmClient       *PyzhmClient
+	selfDriving       *SelfDrivingStrategy
+	schedulable       *SchedulableStrategy
+	tawa              *TawaStrategy
+	targets           map[string]*Target
+	pyzhmNodeMappings map[string]string
+	logger            *zap.Logger
 }
 
 // NewOrchestrator initialized a new orchestrator for all scheduling strategies.
 // By default, the schedulableStrategy is ON, the selfDrivingStrategy is OFF and the tawaStrategy is OFF.
-func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, pyzhmClient *PyzhmClient, logger *zap.Logger, targets map[string]*Target, schedulable map[string]*Schedulable) *Orchestrator {
+func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, pyzhmClient *PyzhmClient, logger *zap.Logger,
+	targets map[string]*Target, schedulable map[string]*Schedulable, pyzhmNodeMappings map[string]string) *Orchestrator {
 	schedulableStrategy := NewSchedulableStrategy(kubeClient, promClient, logger, targets, schedulable)
 	schedulableStrategy.Start()
 	return &Orchestrator{
-		promClient:  promClient,
-		kubeClient:  kubeClient,
-		pyzhmClient: pyzhmClient,
-		selfDriving: NewSelfDrivingStrategy(kubeClient, promClient, logger, targets),
-		schedulable: schedulableStrategy,
-		tawa:        NewTawaStrategy(kubeClient, promClient, logger),
-		targets:     targets,
-		logger:      logger,
+		promClient:        promClient,
+		kubeClient:        kubeClient,
+		pyzhmClient:       pyzhmClient,
+		selfDriving:       NewSelfDrivingStrategy(kubeClient, promClient, logger, targets),
+		schedulable:       schedulableStrategy,
+		tawa:              NewTawaStrategy(kubeClient, promClient, logger),
+		targets:           targets,
+		pyzhmNodeMappings: pyzhmNodeMappings,
+		logger:            logger,
 	}
 }
 
@@ -210,7 +213,9 @@ func (o *Orchestrator) AddWorkload(options ...WorkloadSpawnOption) error {
 			o.logger.Error("failed to get predictions from pyzhm", zap.Error(err))
 			return err
 		}
-		jobBuilder.WithNodeSelector(predictions.Assignments["job1"])
+		// Map node names according to yaml config since pyzhm uses different node names than Kubernetes node names
+		actualNodeName := o.pyzhmNodeMappings[predictions.Assignments["job1"]]
+		jobBuilder.WithNodeSelector(actualNodeName)
 	}
 	job, err := jobBuilder.Build()
 	if err != nil {

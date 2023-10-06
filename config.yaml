@@ -3,3 +3,28 @@ targets:
   ecoqube-dev-default-worker-topo-62xvw-64766d695fxzpd6h-2s6z9: 20
   ecoqube-dev-default-worker-topo-62xvw-64766d695fxzpd6h-9tgpj: 30
   ecoqube-dev-default-worker-topo-62xvw-64766d695fxzpd6h-fb9f8: 50
+pyzhmNodeMappings:
+  L1: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-hd5b4"
+  L3: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-tvxwc"
+  L5: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-xgnsj"
+  L7: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-hd5b4"
+  L9: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-tvxwc"
+  L11: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-xgnsj"
+  L13: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-hd5b4"
+  L15: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-tvxwc"
+  L17: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-xgnsj"
+  L19: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-hd5b4"
+  L21: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-tvxwc"
+  L23: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-xgnsj"
+  R1: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-hd5b4"
+  R3: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-tvxwc"
+  R5: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-xgnsj"
+  R7: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-hd5b4"
+  R9: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-tvxwc"
+  R11: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-xgnsj"
+  R13: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-hd5b4"
+  R15: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-tvxwc"
+  R17: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-xgnsj"
+  R19: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-hd5b4"
+  R21: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-tvxwc"
+  R23: "ecoqube-wkld-dev-default-worker-topo-dsb8l-jcvf8-xgnsj"

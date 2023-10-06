@@ -110,3 +110,28 @@ config:
     node022: 78
     node023: 26
     node024: 99
+  pyzhmNodeMappings:
+    L1: "node001"
+    L3: "node002"
+    L5: "node003"
+    L7: "node004"
+    L9: "node005"
+    L11: "node006"
+    L13: "node007"
+    L15: "node008"
+    L17: "node009"
+    L19: "node010"
+    L21: "node011"
+    L23: "node012"
+    R1: "node013"
+    R3: "node014"
+    R5: "node015"
+    R7: "node016"
+    R9: "node017"
+    R11: "node018"
+    R13: "node019"
+    R15: "node020"
+    R17: "node021"
+    R19: "node022"
+    R21: "node023"
+    R23: "node024"

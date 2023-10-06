@@ -18,8 +18,9 @@ const (
 )
 
 type Config struct {
-	TargetMetricName string             `yaml:"targetMetricName"`
-	Targets          map[string]float64 `yaml:"targets"`
+	TargetMetricName  string             `yaml:"targetMetricName"`
+	Targets           map[string]float64 `yaml:"targets"`
+	PyzhmNodeMappings map[string]string  `yaml:"pyzhmNodeMappings"`
 }
 
 type TargetExporter struct {
