@@ -154,6 +154,21 @@ func (p *Promclient) GetCurrentCpuDiff() ([]NodeCpuUsage, error) {
 
 }
 
+func (p *Promclient) GetNodeCpuDiff(nodeName string) (float64, error) {
+	now := time.Now()
+	result, warnings, err := p.Query(ctx.Background(),
+		cpuDiffMetricName+`{instance="`+nodeName+`"}`,
+		now,
+		v1.WithTimeout(5*time.Second))
+	if err != nil {
+		return 0, err
+	}
+	if len(warnings) > 0 {
+		p.logger.Warn(fmt.Sprintf("Prometheus Warnings: %v\n", warnings))
+	}
+	return strconv.ParseFloat(result.(model.Vector)[0].Value.String(), 64)
+}
+
 func (p *Promclient) GetCurrentEnergyConsumption() (map[string]float64, error) {
 	result, warnings, err := p.Query(context.Background(), "fake_energy_consumption", time.Now(), v1.WithTimeout(5*time.Second))
 	if err != nil {

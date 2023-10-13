@@ -182,7 +182,7 @@ func (o *Orchestrator) AddWorkload(options ...WorkloadSpawnOption) error {
 	// Check if scenario present in HTTP request, if yes, don't read from Prometheus
 	if o.IsTawaEnabled() {
 		var currentEnergyConsumption map[string]float64
-		if spawnOptions.WorkingScenario == nil {
+		if spawnOptions.WorkingScenario == nil || len(spawnOptions.WorkingScenario) == 0 {
 			currentEnergyConsumption, err = o.promClient.GetCurrentEnergyConsumption()
 		} else {
 			currentEnergyConsumption = spawnOptions.WorkingScenario
@@ -213,9 +213,18 @@ func (o *Orchestrator) AddWorkload(options ...WorkloadSpawnOption) error {
 			o.logger.Error("failed to get predictions from pyzhm", zap.Error(err))
 			return err
 		}
+
 		// Map node names according to yaml config since pyzhm uses different node names than Kubernetes node names
 		actualNodeName := o.pyzhmNodeMappings[predictions.Assignments["job1"]]
-		jobBuilder.WithNodeSelector(actualNodeName)
+		// Add node only if selection is on a node currently with actual_cpu < target_cpu, otherwise, continue
+		diffNode, err := o.promClient.GetNodeCpuDiff(actualNodeName)
+		if err != nil {
+			o.logger.Error("failed to get node cpu diff", zap.Error(err))
+			return err
+		}
+		if diffNode > 0 {
+			jobBuilder.WithNodeSelector(actualNodeName)
+		}
 	}
 	job, err := jobBuilder.Build()
 	if err != nil {

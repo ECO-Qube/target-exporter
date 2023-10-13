@@ -44,7 +44,8 @@ const TestScenarioJson = `
 `
 
 type PyzhmClient struct {
-	logger *zap.Logger
+	logger  *zap.Logger
+	address string
 }
 
 type Scenario struct {
@@ -57,8 +58,8 @@ type Predictions struct {
 	Assignments map[string]string `json:"assignments"`
 }
 
-func NewPyzhmClient(logger *zap.Logger) *PyzhmClient {
-	return &PyzhmClient{logger: logger}
+func NewPyzhmClient(logger *zap.Logger, pyzhmAddress string) *PyzhmClient {
+	return &PyzhmClient{logger, pyzhmAddress}
 }
 
 func (p *PyzhmClient) Predict(scenario Scenario) (Predictions, error) {
@@ -69,7 +70,7 @@ func (p *PyzhmClient) Predict(scenario Scenario) (Predictions, error) {
 		return Predictions{}, err
 	}
 	payloadReader := bytes.NewReader(payload)
-	resp, err := http.Post("http://pyzhm.pyzhm.svc.cluster.local:5001/predict", "application/json", payloadReader)
+	resp, err := http.Post(p.address+"/predict", "application/json", payloadReader)
 
 	if err != nil {
 		p.logger.Error("failed to send post request to pyzhm", zap.Error(err))

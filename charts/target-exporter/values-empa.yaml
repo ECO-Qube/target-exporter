@@ -8,7 +8,7 @@ image:
   repository: docker.io/cristianohelio/target-exporter
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "empa"
+  tag: "latest"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -79,37 +79,39 @@ hostNetwork: true
 dnsPolicy: ClusterFirstWithHostNet
 
 # CLI args for target-exporter
-cliArgs: ["--cors-disabled=true",
-          "--kubeconfig=/kubeconfig/ecoqube-dev.kubeconfig",
-          "--promclient-address=http://192.168.10.199:9090"]
+cliArgs: []
+#cliArgs: ["--cors-disabled=true",
+#          "--kubeconfig=/kubeconfig/ecoqube-dev.kubeconfig",
+#          "--promclient-address=http://192.168.10.199:9090",
+#          "--pyzhm-address=http://192.168.10.199:5001"]
 
 config:
   targetMetricName: "fake_energy_target"
   targets:
-    node001: 42
-    node002: 75
-    node003: 18
-    node004: 91
-    node005: 6
-    node006: 37
-    node007: 54
-    node008: 82
-    node009: 11
-    node010: 68
-    node011: 30
-    node012: 63
+    node001: 50
+    node002: 50
+    node003: 50
+    node004: 50
+    node005: 50
+    node006: 50
+    node007: 50
+    node008: 50
+    node009: 50
+    node010: 50
+    node011: 50
+    node012: 50
     node013: 50
-    node014: 22
-    node015: 95
-    node016: 4
-    node017: 87
-    node018: 13
-    node019: 71
-    node020: 46
-    node021: 59
-    node022: 78
-    node023: 26
-    node024: 99
+    node014: 50
+    node015: 50
+    node016: 50
+    node017: 50
+    node018: 50
+    node019: 50
+    node020: 50
+    node021: 50
+    node022: 50
+    node023: 50
+    node024: 50
   pyzhmNodeMappings:
     L1: "node001"
     L3: "node002"

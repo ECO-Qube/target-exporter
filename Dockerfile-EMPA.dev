@@ -9,7 +9,7 @@ COPY . /build
 WORKDIR /build
 
 # Build the binary
-RUN go build -o target-exporter
+RUN go build -o target-exporter -gcflags="all=-N -l"
 
 ########## Runtime ##########
 FROM alpine:3
@@ -24,4 +24,4 @@ COPY --from=builder /go/bin/dlv /
 EXPOSE 8080 40000
 
 # Start Delve
-CMD ./dlv --listen=:40000 --headless=true --api-version=2 --log exec ./target-exporter --continue -- --cors-disabled=true --kubeconfig=/kubeconfig/ecoqube-dev.kubeconfig --promclient-address=http://192.168.10.199:9090
+CMD ./dlv --listen=:40000 --headless=true --api-version=2 --log exec ./target-exporter --accept-multiclient --continue -- --cors-disabled=true --kubeconfig=/kubeconfig/ecoqube-dev.kubeconfig --promclient-address=http://192.168.10.199:9090 --pyzhm-address=http://192.168.10.199:5001

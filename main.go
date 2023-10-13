@@ -48,6 +48,7 @@ var (
 	isCorsDisabled    = false
 	kubeconfig        = ""
 	promclientAddress = ""
+	pyzhmAddress      = ""
 )
 
 func initLogger() {
@@ -75,6 +76,7 @@ func initFlags() {
 	}
 
 	flag.StringVar(&promclientAddress, "promclient-address", "http://localhost:9090", "Prometheus Address for querying")
+	flag.StringVar(&pyzhmAddress, "pyzhm-address", "http://localhost:9090", "PyZHM Address")
 
 	flag.Parse()
 }
@@ -190,7 +192,7 @@ func init() {
 }
 
 func initPyzhmClient() {
-	pyzhmClient = pyzhm.NewPyzhmClient(logger)
+	pyzhmClient = pyzhm.NewPyzhmClient(logger, pyzhmAddress)
 }
 
 func main() {
