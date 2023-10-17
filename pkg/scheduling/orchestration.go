@@ -10,14 +10,22 @@ import (
 )
 
 type WorkloadSpawnOptions struct {
+	JobName         string
 	CpuTarget       int
 	JobLength       int // in minutes
 	CpuCount        int
 	WorkloadType    string
 	WorkingScenario map[string]float64
+	StartDate       time.Time
 }
 
 type WorkloadSpawnOption func(*WorkloadSpawnOptions)
+
+func JobName(name string) WorkloadSpawnOption {
+	return func(options *WorkloadSpawnOptions) {
+		options.JobName = name
+	}
+}
 
 func CpuTarget(target int) WorkloadSpawnOption {
 	return func(options *WorkloadSpawnOptions) {
@@ -46,6 +54,12 @@ func WorkloadType(workloadType string) WorkloadSpawnOption {
 func WorkingScenario(scenario map[string]float64) WorkloadSpawnOption {
 	return func(options *WorkloadSpawnOptions) {
 		options.WorkingScenario = scenario
+	}
+}
+
+func StartDate(startDate time.Time) WorkloadSpawnOption {
+	return func(options *WorkloadSpawnOptions) {
+		options.StartDate = startDate
 	}
 }
 
@@ -96,7 +110,8 @@ func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, pyzhmClient
 	targets map[string]*Target, schedulable map[string]*Schedulable, pyzhmNodeMappings map[string]string) *Orchestrator {
 	schedulableStrategy := NewSchedulableStrategy(kubeClient, promClient, logger, targets, schedulable)
 	schedulableStrategy.Start()
-	return &Orchestrator{
+	// TODO: Check all suspended jobs having
+	o := &Orchestrator{
 		promClient:        promClient,
 		kubeClient:        kubeClient,
 		pyzhmClient:       pyzhmClient,
@@ -107,6 +122,8 @@ func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, pyzhmClient
 		pyzhmNodeMappings: pyzhmNodeMappings,
 		logger:            logger,
 	}
+	go o.CheckStartJobs()
+	return o
 }
 
 func (o *Orchestrator) StartSelfDriving() {
@@ -171,13 +188,15 @@ func (o *Orchestrator) AddWorkload(options ...WorkloadSpawnOption) error {
 	}
 
 	jobBuilder := builder.
+		WithName(spawnOptions.JobName).
 		WithCpuCount(spawnOptions.CpuCount).
 		WithCpuLimit(cpuTarget).
-		WithLength(time.Duration(spawnOptions.JobLength * int(time.Minute))).
+		WithLength(MinutesToDuration(spawnOptions.JobLength)).
 		// TODO: maybe needs more "intelligence"? for now, workload type -> hardware directly but in the future
 		// it could be necessary to map workload type to hardware type depending on what type of workload we get
 		// (e.g. AI workload -> GPU, etc.)
-		WithWorkloadType(HardwareTarget(spawnOptions.WorkloadType))
+		WithWorkloadType(HardwareTarget(spawnOptions.WorkloadType)).
+		WithStartDate(spawnOptions.StartDate)
 
 	// Check if scenario present in HTTP request, if yes, don't read from Prometheus
 	if o.IsTawaEnabled() {
@@ -239,4 +258,26 @@ func (o *Orchestrator) AddWorkload(options ...WorkloadSpawnOption) error {
 		return err
 	}
 	return nil
+}
+
+func (o *Orchestrator) CheckStartJobs() {
+	for {
+		suspendedJobs, err := o.kubeClient.GetSuspendedJobs()
+		if err != nil {
+			o.logger.Error("Error getting suspended jobs from API", zap.Error(err))
+		}
+		for _, suspendedJob := range suspendedJobs {
+			jobStartDate, err := time.Parse(time.RFC3339, suspendedJob.Annotations[JobStartDateAnnotation])
+			if err != nil {
+				o.logger.Error("Error parsing date from JobSelectorLabel annotation", zap.Error(err))
+			}
+			if jobStartDate.Before(time.Now()) {
+				err = o.kubeClient.StartSuspendedJob(suspendedJob.Name)
+				if err != nil {
+					o.logger.Error("Error starting suspended job", zap.Error(err))
+				}
+			}
+		}
+		time.Sleep(3 * time.Second)
+	}
 }

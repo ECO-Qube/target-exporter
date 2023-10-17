@@ -151,7 +151,6 @@ func (p *Promclient) GetCurrentCpuDiff() ([]NodeCpuUsage, error) {
 	}
 
 	return cpuUsagesPerNode, nil
-
 }
 
 func (p *Promclient) GetNodeCpuDiff(nodeName string) (float64, error) {

@@ -64,6 +64,14 @@ type AutomaticJobSpawnRequest struct {
 	enabled
 }
 
+type JobScenarioSpawnRequest struct {
+	JobName      string    `json:"jobName"`
+	JobLength    int       `json:"jobLength"`
+	JobTarget    int       `json:"jobTarget"`
+	WorkersCount int       `json:"workersCount"`
+	StartDate    time.Time `json:"startDate"`
+}
+
 func (t *TargetExporter) StartApi() {
 	// Setup routes
 	r := gin.New()
@@ -108,6 +116,8 @@ func (t *TargetExporter) StartApi() {
 
 		v1.GET("/automatic-job-spawn", t.getAutomaticJobSpawn)
 		v1.PUT("/automatic-job-spawn", t.putAutomaticJobSpawn)
+
+		v1.POST("/job-scenario", t.postJobScenario)
 	}
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -229,7 +239,6 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 		scheduling.JobLength(payload.JobLength),
 		scheduling.CpuCount(payload.CpuCount),
 		scheduling.WorkloadType(string(payload.WorkloadType)),
-		scheduling.WorkingScenario(payload.Scenario),
 	}
 
 	if err := t.o.AddWorkload(opts...); err != nil {
@@ -402,4 +411,26 @@ func (t *TargetExporter) putAutomaticJobSpawn(g *gin.Context) {
 	g.JSON(http.StatusOK, gin.H{
 		"message": "success",
 	})
+}
+
+func (t *TargetExporter) postJobScenario(g *gin.Context) {
+	payload := make([]JobScenarioSpawnRequest, 0)
+	if err := g.BindJSON(&payload); err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	for _, job := range payload {
+		err := t.o.AddWorkload(
+			scheduling.JobName(job.JobName),
+			scheduling.JobLength(job.JobLength),
+			scheduling.CpuTarget(job.JobTarget),
+			scheduling.CpuCount(job.WorkersCount),
+			scheduling.StartDate(job.StartDate),
+		)
+		if err != nil {
+			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
 }

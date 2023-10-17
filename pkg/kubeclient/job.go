@@ -14,6 +14,7 @@ import (
 type HardwareTarget string
 
 const HardwareTypeAnnotation = "ecoqube.eu/hardware-type"
+const JobStartDateAnnotation = "ecoqube.eu/start"
 
 const (
 	CpuIntensive     HardwareTarget = "cpu"
@@ -68,6 +69,7 @@ type JobBuilder interface {
 	WithWorkloadType(HardwareTarget) JobBuilder
 	WithLength(time.Duration) JobBuilder
 	WithNodeSelector(string) JobBuilder
+	WithStartDate(time.Time) JobBuilder
 	Build() (*StressJob, error)
 }
 
@@ -87,6 +89,7 @@ type BaseJob struct {
 	workloadType HardwareTarget
 	nodeSelector map[string]string
 	k8sJob       *v1batch.Job
+	startDate    time.Time
 }
 
 type StressJob struct {
@@ -129,6 +132,11 @@ func (builder *StressJobBuilder) WithLength(length time.Duration) JobBuilder {
 
 func (builder *StressJobBuilder) WithNodeSelector(nodeName string) JobBuilder {
 	builder.job.nodeSelector = map[string]string{"kubernetes.io/hostname": nodeName}
+	return builder
+}
+
+func (builder *StressJobBuilder) WithStartDate(startDate time.Time) JobBuilder {
+	builder.job.startDate = startDate
 	return builder
 }
 
@@ -182,7 +190,6 @@ func (s *StressJob) RenderK8sJob() (*v1batch.Job, error) {
 	job.Spec.Template.Spec.Containers[0].Env[1].Value = fmt.Sprintf("%.0fm", s.length.Minutes())
 	// Ensure deadline
 	job.Spec.ActiveDeadlineSeconds = &deadline
-
 	if s.nodeSelector != nil {
 		job.Spec.Template.Spec.NodeSelector = s.nodeSelector
 	}
@@ -194,10 +201,22 @@ func (s *StressJob) RenderK8sJob() (*v1batch.Job, error) {
 			job.Spec.Template.Spec.NodeSelector[HardwareTypeAnnotation] = workloadType
 		}
 	}
+	// If startDate is after now, add annotation
+	if s.startDate.After(time.Now()) {
+		t := true
+		job.Spec.Suspend = &t
+		annotations := job.GetAnnotations()
+		annotations[JobStartDateAnnotation] = s.startDate.Format(time.RFC3339)
+		job.SetAnnotations(annotations)
+	}
 
 	return job, nil
 }
 
 func generateJobName(jobCpuLimit string) string {
 	return jobCpuLimit + "-cpu-stresstest-" + uuid.New().String()[0:8]
+}
+
+func MinutesToDuration(minutes int) time.Duration {
+	return time.Duration(minutes * int(time.Minute))
 }

@@ -22,10 +22,6 @@ import (
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
 
-const (
-	JobSelectorLabel = "batch.kubernetes.io/job-name"
-)
-
 var policy = metav1.DeletePropagationForeground
 
 type Kubeclient struct {
@@ -198,6 +194,34 @@ func (kc *Kubeclient) GetPodFromName(name string) (*v1.Pod, error) {
 		return nil, err
 	}
 	return pod, nil
+}
+
+func (kc *Kubeclient) GetSuspendedJobs() ([]*v1batch.Job, error) {
+	jobs, err := kc.BatchV1().Jobs(kc.ns).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	suspendedJobs := make([]*v1batch.Job, 100)
+	for _, job := range jobs.Items {
+		if suspended := job.Spec.Suspend; *suspended {
+			suspendedJobs = append(suspendedJobs, &job)
+		}
+	}
+	return suspendedJobs, nil
+}
+
+func (kc *Kubeclient) StartSuspendedJob(jobName string) error {
+	job, err := kc.BatchV1().Jobs(kc.ns).Get(context.TODO(), jobName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	t := true
+	job.Spec.Suspend = &t
+	_, err = kc.BatchV1().Jobs(kc.ns).Update(context.TODO(), job, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // PercentageToResourceQuantity converts a percentage to a resource.Quantity taking into account
