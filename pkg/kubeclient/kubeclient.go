@@ -201,7 +201,7 @@ func (kc *Kubeclient) GetSuspendedJobs() ([]*v1batch.Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	suspendedJobs := make([]*v1batch.Job, 100)
+	suspendedJobs := make([]*v1batch.Job, 0)
 	for _, job := range jobs.Items {
 		if suspended := job.Spec.Suspend; *suspended {
 			suspendedJobs = append(suspendedJobs, &job)
@@ -215,7 +215,7 @@ func (kc *Kubeclient) StartSuspendedJob(jobName string) error {
 	if err != nil {
 		return err
 	}
-	t := true
+	t := false
 	job.Spec.Suspend = &t
 	_, err = kc.BatchV1().Jobs(kc.ns).Update(context.TODO(), job, metav1.UpdateOptions{})
 	if err != nil {

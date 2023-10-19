@@ -251,7 +251,6 @@ func (o *Orchestrator) AddWorkload(options ...WorkloadSpawnOption) error {
 		return err
 	}
 
-	// payload.CpuTarget, payload.CpuCount, time.Duration(payload.JobLength*int(time.Minute)), payload.HardwareTarget
 	err = o.kubeClient.SpawnNewWorkload(job)
 	if err != nil {
 		o.logger.Error("failed to spawn new workload", zap.Error(err))
@@ -267,14 +266,17 @@ func (o *Orchestrator) CheckStartJobs() {
 			o.logger.Error("Error getting suspended jobs from API", zap.Error(err))
 		}
 		for _, suspendedJob := range suspendedJobs {
-			jobStartDate, err := time.Parse(time.RFC3339, suspendedJob.Annotations[JobStartDateAnnotation])
-			if err != nil {
-				o.logger.Error("Error parsing date from JobSelectorLabel annotation", zap.Error(err))
-			}
-			if jobStartDate.Before(time.Now()) {
-				err = o.kubeClient.StartSuspendedJob(suspendedJob.Name)
+			suspendedAnnotation := suspendedJob.Annotations[JobStartDateAnnotation]
+			if suspendedAnnotation != "" {
+				jobStartDate, err := time.Parse(time.RFC3339, suspendedJob.Annotations[JobStartDateAnnotation])
 				if err != nil {
-					o.logger.Error("Error starting suspended job", zap.Error(err))
+					o.logger.Error("Error parsing date from JobSelectorLabel annotation", zap.Error(err))
+				}
+				if jobStartDate.Before(time.Now()) {
+					err = o.kubeClient.StartSuspendedJob(suspendedJob.Name)
+					if err != nil {
+						o.logger.Error("Error starting suspended job", zap.Error(err))
+					}
 				}
 			}
 		}
