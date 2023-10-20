@@ -110,7 +110,6 @@ func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, pyzhmClient
 	targets map[string]*Target, schedulable map[string]*Schedulable, pyzhmNodeMappings map[string]string) *Orchestrator {
 	schedulableStrategy := NewSchedulableStrategy(kubeClient, promClient, logger, targets, schedulable)
 	schedulableStrategy.Start()
-	// TODO: Check all suspended jobs having
 	o := &Orchestrator{
 		promClient:        promClient,
 		kubeClient:        kubeClient,

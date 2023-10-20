@@ -205,7 +205,10 @@ func (s *StressJob) RenderK8sJob() (*v1batch.Job, error) {
 	if s.startDate.After(time.Now()) {
 		t := true
 		job.Spec.Suspend = &t
-		annotations := job.GetAnnotations()
+		annotations := job.Annotations
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
 		annotations[JobStartDateAnnotation] = s.startDate.Format(time.RFC3339)
 		job.SetAnnotations(annotations)
 	}
