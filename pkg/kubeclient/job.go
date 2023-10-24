@@ -15,6 +15,7 @@ type HardwareTarget string
 
 const HardwareTypeAnnotation = "ecoqube.eu/hardware-type"
 const JobStartDateAnnotation = "ecoqube.eu/start"
+const JobMinCpuLimitAnnotation = "ecoqube.eu/min-cpu-limit"
 
 const (
 	CpuIntensive     HardwareTarget = "cpu"
@@ -70,6 +71,7 @@ type JobBuilder interface {
 	WithLength(time.Duration) JobBuilder
 	WithNodeSelector(string) JobBuilder
 	WithStartDate(time.Time) JobBuilder
+	WithMinCpuLimit(resource.Quantity) JobBuilder
 	Build() (*StressJob, error)
 }
 
@@ -79,6 +81,7 @@ type Job interface {
 	GetCpuCount() int
 	GetWorkloadType() HardwareTarget
 	GetNodeSelector() map[string]string
+	WithMinCpuLimit(resource.Quantity) JobBuilder
 	RenderK8sJob() (BaseJob, error)
 }
 
@@ -88,8 +91,10 @@ type BaseJob struct {
 	cpuCount     int
 	workloadType HardwareTarget
 	nodeSelector map[string]string
-	k8sJob       *v1batch.Job
 	startDate    time.Time
+	minCpuLimit  resource.Quantity
+
+	k8sJob *v1batch.Job
 }
 
 type StressJob struct {
@@ -137,6 +142,11 @@ func (builder *StressJobBuilder) WithNodeSelector(nodeName string) JobBuilder {
 
 func (builder *StressJobBuilder) WithStartDate(startDate time.Time) JobBuilder {
 	builder.job.startDate = startDate
+	return builder
+}
+
+func (builder *StressJobBuilder) WithMinCpuLimit(minCpuLimit resource.Quantity) JobBuilder {
+	builder.job.minCpuLimit = minCpuLimit
 	return builder
 }
 
@@ -212,6 +222,14 @@ func (s *StressJob) RenderK8sJob() (*v1batch.Job, error) {
 		annotations[JobStartDateAnnotation] = s.startDate.Format(time.RFC3339)
 		job.SetAnnotations(annotations)
 	}
+
+	// Add min cpu annotation
+	annotations := job.Annotations
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[JobMinCpuLimitAnnotation] = s.minCpuLimit.String()
+	job.SetAnnotations(annotations)
 
 	return job, nil
 }

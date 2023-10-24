@@ -70,6 +70,7 @@ type JobScenarioSpawnRequest struct {
 	JobTarget    int       `json:"jobTarget"`
 	WorkersCount int       `json:"workersCount"`
 	StartDate    time.Time `json:"startDate"`
+	MinCpuLimit  float64   `json:"minJobTarget"`
 }
 
 func (t *TargetExporter) StartApi() {
@@ -427,6 +428,7 @@ func (t *TargetExporter) postJobScenario(g *gin.Context) {
 			scheduling.CpuTarget(job.JobTarget),
 			scheduling.CpuCount(job.WorkersCount),
 			scheduling.StartDate(job.StartDate),
+			scheduling.MinCpuLimit(job.MinCpuLimit),
 		)
 		if err != nil {
 			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

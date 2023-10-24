@@ -17,6 +17,7 @@ type WorkloadSpawnOptions struct {
 	WorkloadType    string
 	WorkingScenario map[string]float64
 	StartDate       time.Time
+	MinCpuLimit     float64 // in percentage
 }
 
 type WorkloadSpawnOption func(*WorkloadSpawnOptions)
@@ -60,6 +61,12 @@ func WorkingScenario(scenario map[string]float64) WorkloadSpawnOption {
 func StartDate(startDate time.Time) WorkloadSpawnOption {
 	return func(options *WorkloadSpawnOptions) {
 		options.StartDate = startDate
+	}
+}
+
+func MinCpuLimit(minCpuLimit float64) WorkloadSpawnOption {
+	return func(options *WorkloadSpawnOptions) {
+		options.MinCpuLimit = minCpuLimit
 	}
 }
 
