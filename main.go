@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"git.helio.dev/eco-qube/target-exporter/pkg/pyzhm"
 	. "git.helio.dev/eco-qube/target-exporter/pkg/scheduling"
+	"git.helio.dev/eco-qube/target-exporter/pkg/serverswitch"
 	promapi "github.com/prometheus/client_golang/api"
 	promapiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -33,14 +34,15 @@ const (
 )
 
 var (
-	orchestrator *Orchestrator
-	api          *TargetExporter
-	kubeclient   *Kubeclient
-	promclient   *Promclient
-	pyzhmClient  *pyzhm.PyzhmClient
-	metricsSrv   *http.Server
-	bootCfg      Config
-	logger       *zap.Logger
+	orchestrator   *Orchestrator
+	api            *TargetExporter
+	kubeclient     *Kubeclient
+	promclient     *Promclient
+	pyzhmClient    *pyzhm.PyzhmClient
+	metricsSrv     *http.Server
+	bootCfg        Config
+	logger         *zap.Logger
+	serverSwitches map[string]*serverswitch.IpmiServerSwitch
 
 	// Flags
 	config            = "config.yaml"
@@ -133,6 +135,18 @@ func initPromClient() {
 	promclient = NewPromClient(promv1, logger)
 }
 
+func initServerOnOff() {
+	// For each server in the bootconfig, create a server switch
+	for k, v := range bootCfg.BmcNodeMappings {
+		sswitch, err := serverswitch.NewIpmiServerSwitch(v, bootCfg.BmcUsername, bootCfg.BmcPassword, logger)
+		if err != nil {
+			logger.Error(fmt.Sprintf("Error creating server switch: %s", err.Error()))
+			continue
+		}
+		serverSwitches[k] = sswitch
+	}
+}
+
 func initMetricsServer() {
 	metricsSrv = &http.Server{
 		Addr:    ":2112",
@@ -141,7 +155,8 @@ func initMetricsServer() {
 }
 
 func initOrchestrator() {
-	fmt.Println("yay", bootCfg.PyzhmNodeMappings)
+	strategy := NewServerOnOffStrategy(serverSwitches, promclient, logger)
+
 	orchestrator = NewOrchestrator(
 		kubeclient,
 		promclient,
@@ -149,6 +164,7 @@ func initOrchestrator() {
 		logger,
 		api.Targets(),
 		api.Schedulable(),
+		strategy,
 		bootCfg.PyzhmNodeMappings,
 	)
 }
@@ -201,6 +217,7 @@ func main() {
 
 	api.StartMetrics()
 	api.StartApi()
+	initServerOnOff()
 	initOrchestrator()
 	api.SetOrchestrator(orchestrator)
 	automaticJobSpawn := NewAutomaticJobSpawn(orchestrator, kubeclient, promclient, logger)

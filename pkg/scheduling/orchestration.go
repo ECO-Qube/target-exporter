@@ -106,6 +106,7 @@ type Orchestrator struct {
 	selfDriving       *SelfDrivingStrategy
 	schedulable       *SchedulableStrategy
 	tawa              *TawaStrategy
+	serverOnOff       *ServerOnOffStrategy
 	targets           map[string]*Target
 	pyzhmNodeMappings map[string]string
 	logger            *zap.Logger
@@ -114,7 +115,7 @@ type Orchestrator struct {
 // NewOrchestrator initialized a new orchestrator for all scheduling strategies.
 // By default, the schedulableStrategy is ON, the selfDrivingStrategy is OFF and the tawaStrategy is OFF.
 func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, pyzhmClient *PyzhmClient, logger *zap.Logger,
-	targets map[string]*Target, schedulable map[string]*Schedulable, pyzhmNodeMappings map[string]string) *Orchestrator {
+	targets map[string]*Target, schedulable map[string]*Schedulable, serverOnOff *ServerOnOffStrategy, pyzhmNodeMappings map[string]string) *Orchestrator {
 	schedulableStrategy := NewSchedulableStrategy(kubeClient, promClient, logger, targets, schedulable)
 	schedulableStrategy.Start()
 	o := &Orchestrator{
@@ -124,6 +125,7 @@ func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, pyzhmClient
 		selfDriving:       NewSelfDrivingStrategy(kubeClient, promClient, logger, targets),
 		schedulable:       schedulableStrategy,
 		tawa:              NewTawaStrategy(kubeClient, promClient, logger),
+		serverOnOff:       serverOnOff,
 		targets:           targets,
 		pyzhmNodeMappings: pyzhmNodeMappings,
 		logger:            logger,

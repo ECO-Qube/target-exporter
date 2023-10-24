@@ -21,6 +21,9 @@ type Config struct {
 	TargetMetricName  string             `yaml:"targetMetricName"`
 	Targets           map[string]float64 `yaml:"targets"`
 	PyzhmNodeMappings map[string]string  `yaml:"pyzhmNodeMappings"`
+	BmcNodeMappings   map[string]string  `yaml:"bmcNodeMappings"`
+	BmcUsername       string             `yaml:"bmcUsername"`
+	BmcPassword       string             `yaml:"bmcPassword"`
 }
 
 type TargetExporter struct {
