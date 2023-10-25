@@ -136,6 +136,7 @@ func initPromClient() {
 }
 
 func initServerOnOff() {
+	serverSwitches = make(map[string]*serverswitch.IpmiServerSwitch)
 	// For each server in the bootconfig, create a server switch
 	for k, v := range bootCfg.BmcNodeMappings {
 		sswitch, err := serverswitch.NewIpmiServerSwitch(v, bootCfg.BmcUsername, bootCfg.BmcPassword, logger)
@@ -156,6 +157,8 @@ func initMetricsServer() {
 
 func initOrchestrator() {
 	strategy := NewServerOnOffStrategy(serverSwitches, promclient, logger)
+	// TODO: Add switch to turn on/off to the dashboard
+	strategy.Start()
 
 	orchestrator = NewOrchestrator(
 		kubeclient,

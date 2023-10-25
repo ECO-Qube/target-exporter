@@ -62,9 +62,22 @@ autoscaling:
 
 nodeSelector: {}
 
-tolerations: []
+# ! EMPA workaround ! label must be added to "headnode" node
+#nodeName: "ecoqube-wkld-dev-ptjpr-lzv2d"
+
+tolerations:
+  - key: "control-plane"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
 
 affinity: {}
+
+# ! EMPA workaround !
+hostNetwork: true
+# ! EMPA workaround !
+dnsPolicy: ClusterFirstWithHostNet
+
 
 # CLI args for target-exporter
 cliArgs: ["--cors-disabled=true",

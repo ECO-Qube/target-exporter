@@ -3,6 +3,7 @@ package scheduling
 import (
 	"fmt"
 	"go.uber.org/zap"
+	"time"
 )
 import . "git.helio.dev/eco-qube/target-exporter/pkg/promclient"
 import . "git.helio.dev/eco-qube/target-exporter/pkg/serverswitch"
@@ -33,17 +34,12 @@ func (t *ServerOnOffStrategy) Reconcile() error {
 
 	// Check if server is on
 	for _, currentDiff := range diffs {
-		for _, v := range diffs {
-			serverOn, err := t.serverSwitches[currentDiff.NodeName].IsServerOn()
-			if err != nil {
-				t.logger.Error("error checking if server is on", zap.Error(err))
-				return err
-			}
-			t.logger.Info("error checking if server is on", zap.Error(err), zap.Bool("isOn", serverOn), zap.String("server", v.NodeName))
+		var isOn bool
+		if isOn, err = t.serverSwitches[currentDiff.NodeName].IsServerOn(); err != nil {
+			t.logger.Error("error checking if server is on, retrying", zap.Error(err), zap.String("server", t.serverSwitches[currentDiff.NodeName].GetBmcEndpoint()))
+			retryServerConn(t.serverSwitches[currentDiff.NodeName], t.logger)
 		}
-		//if isOn, err := t.serverSwitch.IsServerOn(); err != nil {
-		//	t.logger.Info("error checking if server is on", zap.Error(err), zap.Bool("isOn", isOn), zap.String("server", t.serverSwitch.GetBmcEndpoint()))
-		//}
+		t.logger.Info("checked if server is on", zap.Bool("isOn", isOn), zap.String("server", t.serverSwitches[currentDiff.NodeName].GetBmcEndpoint()))
 	}
 
 	return nil
@@ -55,4 +51,18 @@ func (t *ServerOnOffStrategy) Start() {
 
 func (t *ServerOnOffStrategy) Stop() {
 	t.BaseConcurrentStrategy.Stop()
+}
+
+func retryServerConn(srvSwitch *IpmiServerSwitch, logger *zap.Logger) {
+	retries := 3
+	delay := 5 * time.Second
+	for i := 0; i < retries; i++ {
+		err := srvSwitch.RetryConn()
+		if err != nil {
+			logger.Error("failed to retry connection", zap.Error(err), zap.String("server", srvSwitch.GetBmcEndpoint()))
+			time.Sleep(delay)
+		} else {
+			break
+		}
+	}
 }
