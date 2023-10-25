@@ -46,6 +46,21 @@ func (i *IpmiServerSwitch) PowerOn() error {
 }
 
 func (i *IpmiServerSwitch) PowerOff() error {
+	request := &Request{
+		NetworkFunction: NetworkFunctionChassis,
+		Command:         CommandChassisControl,
+		Data:            &ChassisControlRequest{ChassisControl: ControlPowerCycle},
+	}
+	response := &ChassisControlResponse{}
+	err := i.c.Send(request, response)
+	if err != nil {
+		i.logger.Error("error sending power off command", zap.Error(err))
+		return err
+	}
+	if response.CompletionCode != CommandCompleted {
+		i.logger.Error("error powering off server", zap.Uint8("completion_code", uint8(response.CompletionCode)))
+		return fmt.Errorf("error powering off server")
+	}
 	return nil
 }
 

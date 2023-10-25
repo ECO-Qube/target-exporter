@@ -33,6 +33,11 @@ type NodeCpuUsage struct {
 	Data     []InstantCpuUsage `json:"usage"`
 }
 
+type NodeInstantCpuUsage struct {
+	NodeName string  `json:"nodeName"`
+	Data     float64 `json:"usage"`
+}
+
 func NewPromClient(client v1.API, logger *zap.Logger) *Promclient {
 	return &Promclient{client, logger}
 }
@@ -212,6 +217,31 @@ func (p *Promclient) GetCpuCounts() (map[string]int, error) {
 	}
 
 	return cpuCounts, nil
+}
+
+func (p *Promclient) GetAvgCpuUsages(minutes int) ([]NodeInstantCpuUsage, error) {
+	result, warnings, err := p.Query(ctx.Background(),
+		fmt.Sprintf("avg_over_time(node_cpu_utilization[%dm])", minutes),
+		time.Now(),
+		v1.WithTimeout(5*time.Second))
+	if err != nil {
+		return nil, err
+	}
+	if len(warnings) > 0 {
+		p.logger.Warn(fmt.Sprintf("Prometheus Warnings: %v\n", warnings))
+	}
+	avgUsages := make([]NodeInstantCpuUsage, 0)
+	for _, entry := range result.(model.Vector) {
+		usage, err := strconv.ParseFloat(entry.Value.String(), 64)
+		if err != nil {
+			return nil, err
+		}
+		avgUsages = append(avgUsages, NodeInstantCpuUsage{
+			NodeName: string(model.LabelSet(entry.Metric)["instance"]),
+			Data:     usage,
+		})
+	}
+	return avgUsages, nil
 }
 
 func GetAvgInstantUsage(usages []InstantCpuUsage) float64 {
