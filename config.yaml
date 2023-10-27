@@ -76,3 +76,4 @@ bmcNodeMappings:
   node024: 192.168.10.51
 bmcUsername: <REDACTED>
 bmcPassword: <REDACTED>
+setpoints: [5, 50, 80, 100]

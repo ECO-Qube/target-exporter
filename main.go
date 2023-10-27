@@ -169,6 +169,7 @@ func initOrchestrator() {
 		api.Schedulable(),
 		strategy,
 		bootCfg.PyzhmNodeMappings,
+		bootCfg.Setpoints,
 	)
 }
 

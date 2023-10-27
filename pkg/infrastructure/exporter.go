@@ -24,6 +24,7 @@ type Config struct {
 	BmcNodeMappings   map[string]string  `yaml:"bmcNodeMappings"`
 	BmcUsername       string             `yaml:"bmcUsername"`
 	BmcPassword       string             `yaml:"bmcPassword"`
+	Setpoints         []float64          `yaml:"setpoints"`
 }
 
 type TargetExporter struct {
