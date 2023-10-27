@@ -118,6 +118,9 @@ func (t *TargetExporter) StartApi() {
 		v1.GET("/automatic-job-spawn", t.getAutomaticJobSpawn)
 		v1.PUT("/automatic-job-spawn", t.putAutomaticJobSpawn)
 
+		v1.GET("/server-on-off", t.getServerOnOff)
+		v1.PUT("/server-on-off", t.putServerOnOff)
+
 		v1.POST("/job-scenario", t.postJobScenario)
 	}
 	srv := &http.Server{
@@ -408,6 +411,29 @@ func (t *TargetExporter) putAutomaticJobSpawn(g *gin.Context) {
 		t.automaticJobSpawn.Start()
 	} else {
 		t.automaticJobSpawn.Stop()
+	}
+	g.JSON(http.StatusOK, gin.H{
+		"message": "success",
+	})
+}
+
+func (t *TargetExporter) getServerOnOff(g *gin.Context) {
+	g.JSON(http.StatusOK, gin.H{
+		"enabled": t.o.IsSchedulableEnabled(),
+	})
+}
+
+func (t *TargetExporter) putServerOnOff(g *gin.Context) {
+	payload := SchedulableRequest{}
+	if err := g.BindJSON(&payload); err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if payload.Enabled {
+		t.o.StartServerOnOff()
+	} else {
+		t.o.StopServerOnOff()
 	}
 	g.JSON(http.StatusOK, gin.H{
 		"message": "success",

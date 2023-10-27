@@ -174,6 +174,18 @@ func (o *Orchestrator) IsTawaEnabled() bool {
 	return o.tawa.IsRunning()
 }
 
+func (o *Orchestrator) StartServerOnOff() {
+	o.serverOnOff.Start()
+}
+
+func (o *Orchestrator) StopServerOnOff() {
+	o.serverOnOff.Stop()
+}
+
+func (o *Orchestrator) IsServerOnOffEnabled() bool {
+	return o.serverOnOff.IsRunning()
+}
+
 // AddWorkload adds a workload to the queue (for now, it spawns it directly).
 func (o *Orchestrator) AddWorkload(options ...WorkloadSpawnOption) error {
 	spawnOptions := &WorkloadSpawnOptions{}
@@ -306,12 +318,10 @@ func (o *Orchestrator) ReduceTargets() {
 		}
 		for nodeName, target := range o.targets {
 			for _, avgUsage := range avgCpuUsage {
-				if avgUsage.NodeName == nodeName {
-					if avgUsage.Data < target.GetTarget() {
-						// Reduce target
-						o.logger.Info("reducing target", zap.String("node", nodeName), zap.Float64("target", target.GetTarget()))
-						target.Set(getLowerSetpoint(o.setpoints, target.GetTarget()))
-					}
+				if avgUsage.NodeName == nodeName && avgUsage.Data < target.GetTarget() {
+					// Reduce target
+					o.logger.Info("reducing target", zap.String("node", nodeName), zap.Float64("target", target.GetTarget()))
+					target.Set(getLowerSetpoint(o.setpoints, target.GetTarget()))
 				}
 			}
 		}
