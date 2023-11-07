@@ -13,7 +13,7 @@ import (
 
 const AdjustmentSlack = 2
 const TimeSinceInsertionThreshold = 1 * time.Minute
-const TimeSinceSchedulingThreshold = 2 * time.Minute
+const TimeSinceSchedulingThreshold = 1 * time.Minute
 
 type SkipItem struct {
 	PodName       string
@@ -72,7 +72,16 @@ func (s *SelfDrivingStrategy) Reconcile() error {
 		if err != nil {
 			return err
 		}
-		deltas, err := getViolatingPodsDelta(cpuCounts, nodeDiff, pods)
+
+		filteredPods := make([]v1.Pod, 0)
+		for _, pod := range pods {
+			if s.shouldSkipPod(pod) {
+				continue
+			}
+			filteredPods = append(filteredPods, pod)
+		}
+
+		deltas, err := getViolatingPodsDelta(cpuCounts, nodeDiff, filteredPods)
 		if err != nil {
 			s.logger.Error("failed to get violating pods delta", zap.Error(err))
 			return err
@@ -80,17 +89,27 @@ func (s *SelfDrivingStrategy) Reconcile() error {
 		for podName, deltaEntry := range deltas {
 			if deltaEntry.update != 0 {
 				// patch
-				perc, err := kubeclient.PercentageToResourceQuantity(cpuCounts, deltaEntry.update, deltaEntry.nodeName)
+				delta, err := kubeclient.PercentageToResourceQuantity(cpuCounts, deltaEntry.update, deltaEntry.nodeName)
 				if err != nil {
 					s.logger.Error("failed to convert resource quantity to percentage", zap.Error(err))
 					return err
 				}
-				err = kubeClient.PatchCpuLimit(perc, podName)
+				cpuLimit := getPodFromName(filteredPods, podName).Spec.Containers[0].Resources.Limits.Cpu().DeepCopy()
+				if isNodeAboveTarget(avgDiff) {
+					cpuLimit.Sub(delta)
+					s.logger.Debug("node is below target", zap.String("node", deltaEntry.nodeName),
+						zap.String("pod", podName), zap.Float64("delta", deltaEntry.update), zap.String("newCpuLimit", cpuLimit.String()))
+				} else if isNodeBelowTarget(avgDiff) {
+					cpuLimit.Add(delta)
+					s.logger.Debug("node is above target", zap.String("node", deltaEntry.nodeName),
+						zap.String("pod", podName), zap.Float64("delta", deltaEntry.update), zap.String("newCpuLimit", cpuLimit.String()))
+				}
+				err = kubeClient.PatchCpuLimit(cpuLimit, podName)
 				if err != nil {
 					s.logger.Error("failed to patch cpu limit", zap.Error(err))
 					return err
 				}
-				s.addPodToSkipList(*getPodFromName(pods, podName))
+				s.addPodToSkipList(*getPodFromName(filteredPods, podName))
 			}
 		}
 	}
@@ -121,7 +140,15 @@ func (s *SelfDrivingStrategy) refreshSkiplist() error {
 }
 
 func (s *SelfDrivingStrategy) shouldSkipPod(pod v1.Pod) bool {
-	if strings.Contains(pod.Name, "telemetry-aware-scheduling") || s.skipForNow.containsPod(pod.Name) {
+	s.logger.Info("checking if pod should be skipped", zap.String("podName", pod.Name),
+		zap.Bool("skipForNow.containsPod", s.skipForNow.containsPod(pod.Name)),
+		zap.String("podPhase", string(pod.Status.Phase)),
+		zap.Duration("timeSinceScheduling", getTimeSincePodScheduled(pod)),
+	)
+
+	if strings.Contains(pod.Name, "telemetry-aware-scheduling") ||
+		s.skipForNow.containsPod(pod.Name) ||
+		getTimeSincePodScheduled(pod) < TimeSinceSchedulingThreshold {
 		return true
 	}
 	return false
@@ -286,11 +313,11 @@ func (s SkipList) isInsertedMoreThan(podName string, d time.Duration) bool {
 }
 
 func isNodeAboveTarget(avgDiff float64) bool {
-	return avgDiff < -AdjustmentSlack
+	return avgDiff > AdjustmentSlack
 }
 
 func isNodeBelowTarget(avgDiff float64) bool {
-	return avgDiff > AdjustmentSlack
+	return avgDiff < -AdjustmentSlack
 }
 
 // Values can also be 0. Negative values mean that the pod needs to be throttled, positive values mean that the pod CPU limit can be increased.
@@ -338,12 +365,13 @@ func getViolatingPodsDelta(cpuCounts map[string]int, diffs promclient.NodeCpuUsa
 	ignorePartials := 0.0
 	notSubceeding := make([]v1.Pod, 0)
 
+	// Build a map of pod name to new cpu limit
 	for _, pod := range violatingPods {
 		minPodCpu, err := kubeclient.GetMinCpu(pod)
-		if err.Error() == "job min annotation not found" {
-			continue
-		}
 		if err != nil {
+			if err.Error() == "job min annotation not found" {
+				continue
+			}
 			return nil, err
 		}
 		podCpuLimitQuantity := pod.Spec.Containers[0].Resources.Limits.Cpu()
@@ -361,6 +389,7 @@ func getViolatingPodsDelta(cpuCounts map[string]int, diffs promclient.NodeCpuUsa
 			notSubceeding = append(notSubceeding, pod)
 		}
 	}
+	// Deal with pods that have not their cpu limit subceeding their minimum cpu
 	for _, pod := range notSubceeding {
 		updates[pod.Name] = struct {
 			update   float64
