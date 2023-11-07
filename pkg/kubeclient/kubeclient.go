@@ -60,6 +60,20 @@ func (kc *Kubeclient) GetPodsInNamespace() (*v1.PodList, error) {
 	return pods, nil
 }
 
+func (kc *Kubeclient) GetPodsInNamespaceByNode(nodeName string) ([]v1.Pod, error) {
+	pods, err := kc.GetPodsInNamespace()
+	if err != nil {
+		return nil, err
+	}
+	filteredPods := make([]v1.Pod, 0)
+	for _, pod := range pods.Items {
+		if pod.Spec.NodeName == nodeName {
+			filteredPods = append(filteredPods, pod)
+		}
+	}
+	return filteredPods, nil
+}
+
 // SpawnNewWorkload creates a new stress test workload
 func (kc *Kubeclient) SpawnNewWorkload(job *StressJob) error {
 	k8sJob, err := job.RenderK8sJob()

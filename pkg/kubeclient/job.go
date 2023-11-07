@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	v1batch "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"strconv"
@@ -240,4 +241,18 @@ func generateJobName(jobCpuLimit string) string {
 
 func MinutesToDuration(minutes int) time.Duration {
 	return time.Duration(minutes * int(time.Minute))
+}
+
+func GetMinCpu(pod v1.Pod) (float64, error) {
+	// Get min cpu limit from annotation
+	minCpuLimit, ok := pod.Annotations[JobMinCpuLimitAnnotation]
+	if !ok {
+		return 0, fmt.Errorf("job min annotation not found")
+	}
+	// Parse annotation to float
+	minCpuLimitFloat, err := strconv.ParseFloat(minCpuLimit, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse min cpu limit")
+	}
+	return minCpuLimitFloat, nil
 }
