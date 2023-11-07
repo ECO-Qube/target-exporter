@@ -7,6 +7,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -59,6 +60,14 @@ func (s *SelfDrivingStrategy) Reconcile() error {
 		if !isNodeInViolation(avgDiff) {
 			continue
 		}
+		s.logger.Debug("node violating target", zap.String("node", nodeDiff.NodeName),
+			zap.Float64("target", s.targets[nodeDiff.NodeName].GetTarget()),
+			zap.Float64("usage", -promclient.GetAvgInstantUsage(nodeDiff.Data)),
+		)
+		err = s.refreshSkiplist()
+		if err != nil {
+			return err
+		}
 		pods, err := kubeClient.GetPodsInNamespaceByNode(nodeDiff.NodeName)
 		if err != nil {
 			return err
@@ -81,10 +90,49 @@ func (s *SelfDrivingStrategy) Reconcile() error {
 					s.logger.Error("failed to patch cpu limit", zap.Error(err))
 					return err
 				}
+				s.addPodToSkipList(*getPodFromName(pods, k))
 			}
 		}
 	}
 	return nil
+}
+
+func (s *SelfDrivingStrategy) refreshSkiplist() error {
+	// Remove all items from skip where timeSSi > 1m OR where the corresponding pod is completed
+	pods, err := s.kubeClient.GetPodsInNamespace()
+	if err != nil {
+		return err
+	}
+	for i, skippedPod := range s.skipForNow {
+		timeSinceInsertion := time.Since(skippedPod.InsertionTime)
+		kubePod := getPodFromName(pods, skippedPod.PodName)
+		if err != nil {
+			s.logger.Error("failed to get pod from name", zap.Error(err))
+			return err
+		}
+		// If pod is completed or time since insertion is greater than threshold, remove from skip list
+		if timeSinceInsertion > TimeSinceInsertionThreshold || isPodCompleted(kubePod) {
+			s.logger.Debug("removing item from skip list", zap.String("podName", s.skipForNow[i].PodName))
+			s.skipForNow = removeIndex(s.skipForNow, i)
+		}
+	}
+
+	return nil
+}
+
+func (s *SelfDrivingStrategy) shouldSkipPod(pod v1.Pod) bool {
+	if strings.Contains(pod.Name, "telemetry-aware-scheduling") || s.skipForNow.containsPod(pod.Name) {
+		return true
+	}
+	return false
+}
+
+func (s *SelfDrivingStrategy) addPodToSkipList(pod v1.Pod) {
+	s.skipForNow = append(s.skipForNow, SkipItem{
+		PodName:       pod.Name,
+		InsertionTime: time.Now(),
+		CpuLimit:      *pod.Spec.Containers[0].Resources.Limits.Cpu(),
+	})
 }
 
 func isNodeInViolation(avgDiff float64) bool {
@@ -193,8 +241,8 @@ func isPodCompleted(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed
 }
 
-func getPodFromName(podList *v1.PodList, name string) *v1.Pod {
-	for _, pod := range podList.Items {
+func getPodFromName(podList []v1.Pod, name string) *v1.Pod {
+	for _, pod := range podList {
 		if pod.Name == name {
 			return &pod
 		}
@@ -245,7 +293,6 @@ func isNodeBelowTarget(avgDiff float64) bool {
 	return avgDiff > AdjustmentSlack
 }
 
-// getViolatingPodsDelta returns a map of pod names to cpu deltas that needs updating by a certain delta.
 // Values can also be 0. Negative values mean that the pod needs to be throttled, positive values mean that the pod CPU limit can be increased.
 func getViolatingPodsDelta(cpuCounts map[string]int, diffs promclient.NodeCpuUsage, violatingPods []v1.Pod) (map[string]float64, error) {
 	updates := make(map[string]float64)
@@ -269,7 +316,8 @@ func getViolatingPodsDelta(cpuCounts map[string]int, diffs promclient.NodeCpuUsa
 	// that would have its delta subceeding its min_job.
 	avgNodeDiff := promclient.GetAvgInstantUsage(diffs.Data)
 	if avgNodeDiff >= 0 {
-		// Simple average, no need to take into consideration min
+		// Simple average, no need to take into consideration min. This is because when we relax pod limits we don't
+		// have to check if the adjustment goes below the min cpu as the difference is never negative (i.e. throttling)
 		simpleDelta := math.Abs(avgNodeDiff) / float64(len(violatingPods))
 		for _, pod := range violatingPods {
 			updates[pod.Name] = simpleDelta
@@ -301,8 +349,8 @@ func getViolatingPodsDelta(cpuCounts map[string]int, diffs promclient.NodeCpuUsa
 			notSubceeding = append(notSubceeding, pod)
 		}
 	}
-	for _, v := range notSubceeding {
-		updates[v.Name] = (avgNodeDiff - ignorePartials) / (float64(len(violatingPods) - subceedingCount))
+	for _, pod := range notSubceeding {
+		updates[pod.Name] = (avgNodeDiff - ignorePartials) / (float64(len(violatingPods) - subceedingCount))
 	}
 
 	return updates, nil

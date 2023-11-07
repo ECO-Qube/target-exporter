@@ -153,8 +153,8 @@ func (t *TargetExporter) getWorkloads(g *gin.Context) {
 		return
 	}
 
-	workloads := make([]Workload, len(pods.Items))
-	for i, pod := range pods.Items {
+	workloads := make([]Workload, len(pods))
+	for i, pod := range pods {
 		target, err := kubeclient.ResourceQuantityToPercentage(cpuCounts, *pod.Spec.Containers[0].Resources.Limits.Cpu(), "")
 		if err != nil {
 			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

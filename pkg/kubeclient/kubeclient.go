@@ -49,7 +49,7 @@ func (kc *Kubeclient) PatchCpuLimit(limit resource.Quantity, podName string) err
 	return nil
 }
 
-func (kc *Kubeclient) GetPodsInNamespace() (*v1.PodList, error) {
+func (kc *Kubeclient) GetPodsInNamespace() ([]v1.Pod, error) {
 	// https://github.com/kubernetes/client-go/blob/master/examples/out-of-cluster-client-configuration/main.go
 	// TODO: Make namespace configurable or get via label selection
 	pods, err := kc.CoreV1().Pods(kc.ns).List(context.TODO(), metav1.ListOptions{})
@@ -57,7 +57,11 @@ func (kc *Kubeclient) GetPodsInNamespace() (*v1.PodList, error) {
 		kc.logger.Error("Error getting pods", zap.Error(err))
 		return nil, err
 	}
-	return pods, nil
+	array := make([]v1.Pod, len(pods.Items))
+	for i, pod := range pods.Items {
+		array[i] = pod
+	}
+	return array, nil
 }
 
 func (kc *Kubeclient) GetPodsInNamespaceByNode(nodeName string) ([]v1.Pod, error) {
@@ -66,7 +70,7 @@ func (kc *Kubeclient) GetPodsInNamespaceByNode(nodeName string) ([]v1.Pod, error
 		return nil, err
 	}
 	filteredPods := make([]v1.Pod, 0)
-	for _, pod := range pods.Items {
+	for _, pod := range pods {
 		if pod.Spec.NodeName == nodeName {
 			filteredPods = append(filteredPods, pod)
 		}
