@@ -134,7 +134,7 @@ func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, pyzhmClient
 		logger:            logger,
 	}
 	go o.CheckStartJobs()
-	go o.ReduceTargets()
+	//go o.ReduceTargets()
 	return o
 }
 
@@ -215,6 +215,7 @@ func (o *Orchestrator) AddWorkload(options ...WorkloadSpawnOption) error {
 		WithName(spawnOptions.JobName).
 		WithCpuCount(spawnOptions.CpuCount).
 		WithCpuLimit(cpuTarget).
+		WithMinCpuLimit(spawnOptions.MinCpuLimit).
 		WithLength(MinutesToDuration(spawnOptions.JobLength)).
 		// TODO: maybe needs more "intelligence"? for now, workload type -> hardware directly but in the future
 		// it could be necessary to map workload type to hardware type depending on what type of workload we get

@@ -77,20 +77,20 @@ func (s *SelfDrivingStrategy) Reconcile() error {
 			s.logger.Error("failed to get violating pods delta", zap.Error(err))
 			return err
 		}
-		for k, v := range deltas {
-			if v != 0 {
+		for podName, deltaEntry := range deltas {
+			if deltaEntry.update != 0 {
 				// patch
-				perc, err := kubeclient.PercentageToResourceQuantity(cpuCounts, v, k)
+				perc, err := kubeclient.PercentageToResourceQuantity(cpuCounts, deltaEntry.update, deltaEntry.nodeName)
 				if err != nil {
 					s.logger.Error("failed to convert resource quantity to percentage", zap.Error(err))
 					return err
 				}
-				err = kubeClient.PatchCpuLimit(perc, k)
+				err = kubeClient.PatchCpuLimit(perc, podName)
 				if err != nil {
 					s.logger.Error("failed to patch cpu limit", zap.Error(err))
 					return err
 				}
-				s.addPodToSkipList(*getPodFromName(pods, k))
+				s.addPodToSkipList(*getPodFromName(pods, podName))
 			}
 		}
 	}
@@ -294,8 +294,14 @@ func isNodeBelowTarget(avgDiff float64) bool {
 }
 
 // Values can also be 0. Negative values mean that the pod needs to be throttled, positive values mean that the pod CPU limit can be increased.
-func getViolatingPodsDelta(cpuCounts map[string]int, diffs promclient.NodeCpuUsage, violatingPods []v1.Pod) (map[string]float64, error) {
-	updates := make(map[string]float64)
+func getViolatingPodsDelta(cpuCounts map[string]int, diffs promclient.NodeCpuUsage, violatingPods []v1.Pod) (map[string]struct {
+	update   float64
+	nodeName string
+}, error) {
+	updates := make(map[string]struct {
+		update   float64
+		nodeName string
+	})
 	// If node diff is >= 0, return simple average because the adjustment will be surely not subceed min cpu of job
 	// For each pod p in pods
 	//		delta := min_cpu(p) - |simple_delta|
@@ -320,7 +326,10 @@ func getViolatingPodsDelta(cpuCounts map[string]int, diffs promclient.NodeCpuUsa
 		// have to check if the adjustment goes below the min cpu as the difference is never negative (i.e. throttling)
 		simpleDelta := math.Abs(avgNodeDiff) / float64(len(violatingPods))
 		for _, pod := range violatingPods {
-			updates[pod.Name] = simpleDelta
+			updates[pod.Name] = struct {
+				update   float64
+				nodeName string
+			}{update: simpleDelta, nodeName: diffs.NodeName}
 		}
 		return updates, nil
 	}
@@ -342,7 +351,10 @@ func getViolatingPodsDelta(cpuCounts map[string]int, diffs promclient.NodeCpuUsa
 		delta := minPodCpu - math.Abs(avgNodeDiff)
 		if delta < 0 {
 			delta = podCpuLimit - minPodCpu
-			updates[pod.Name] = delta
+			updates[pod.Name] = struct {
+				update   float64
+				nodeName string
+			}{update: delta, nodeName: diffs.NodeName}
 			ignorePartials += delta
 			subceedingCount += 1
 		} else {
@@ -350,7 +362,13 @@ func getViolatingPodsDelta(cpuCounts map[string]int, diffs promclient.NodeCpuUsa
 		}
 	}
 	for _, pod := range notSubceeding {
-		updates[pod.Name] = (avgNodeDiff - ignorePartials) / (float64(len(violatingPods) - subceedingCount))
+		updates[pod.Name] = struct {
+			update   float64
+			nodeName string
+		}{
+			update:   (avgNodeDiff - ignorePartials) / (float64(len(violatingPods) - subceedingCount)),
+			nodeName: diffs.NodeName,
+		}
 	}
 
 	return updates, nil

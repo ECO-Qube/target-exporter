@@ -72,7 +72,7 @@ type JobBuilder interface {
 	WithLength(time.Duration) JobBuilder
 	WithNodeSelector(string) JobBuilder
 	WithStartDate(time.Time) JobBuilder
-	WithMinCpuLimit(resource.Quantity) JobBuilder
+	WithMinCpuLimit(float64) JobBuilder
 	Build() (*StressJob, error)
 }
 
@@ -93,7 +93,7 @@ type BaseJob struct {
 	workloadType HardwareTarget
 	nodeSelector map[string]string
 	startDate    time.Time
-	minCpuLimit  resource.Quantity
+	minCpuLimit  float64
 
 	k8sJob *v1batch.Job
 }
@@ -146,7 +146,7 @@ func (builder *StressJobBuilder) WithStartDate(startDate time.Time) JobBuilder {
 	return builder
 }
 
-func (builder *StressJobBuilder) WithMinCpuLimit(minCpuLimit resource.Quantity) JobBuilder {
+func (builder *StressJobBuilder) WithMinCpuLimit(minCpuLimit float64) JobBuilder {
 	builder.job.minCpuLimit = minCpuLimit
 	return builder
 }
@@ -225,12 +225,12 @@ func (s *StressJob) RenderK8sJob() (*v1batch.Job, error) {
 	}
 
 	// Add min cpu annotation
-	annotations := job.Annotations
+	annotations := job.Spec.Template.Annotations
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
-	annotations[JobMinCpuLimitAnnotation] = s.minCpuLimit.String()
-	job.SetAnnotations(annotations)
+	annotations[JobMinCpuLimitAnnotation] = fmt.Sprintf("%f", s.minCpuLimit)
+	job.Spec.Template.SetAnnotations(annotations)
 
 	return job, nil
 }

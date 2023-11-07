@@ -24,11 +24,12 @@ type TargetsRequest struct {
 }
 
 type Workload struct {
-	Name           string `json:"name"`
-	Status         string `json:"status"`
-	SubmissionDate string `json:"submissionDate"`
-	NodeName       string `json:"nodeName"`
-	CpuTarget      int    `json:"cpuTarget"`
+	Name           string  `json:"name"`
+	Status         string  `json:"status"`
+	SubmissionDate string  `json:"submissionDate"`
+	NodeName       string  `json:"nodeName"`
+	CpuTarget      int     `json:"cpuTarget"`
+	MinCpuLimit    float64 `json:"minCpuLimit"`
 }
 
 type WorkloadsList struct {
@@ -38,6 +39,7 @@ type WorkloadsList struct {
 type WorkloadRequest struct {
 	PodName      string                    `json:"podName,omitempty"`
 	CpuTarget    int                       `json:"cpuTarget"`
+	MinCpuLimit  float64                   `json:"minCpuLimit"`
 	JobLength    int                       `json:"jobLength"`
 	CpuCount     int                       `json:"cpuCount"`
 	WorkloadType kubeclient.HardwareTarget `json:"workloadType"`
@@ -70,7 +72,7 @@ type JobScenarioSpawnRequest struct {
 	JobTarget    int       `json:"jobTarget"`
 	WorkersCount int       `json:"workersCount"`
 	StartDate    time.Time `json:"startDate"`
-	MinCpuLimit  float64   `json:"minJobTarget"`
+	MinCpuLimit  float64   `json:"minCpuLimit"`
 }
 
 func (t *TargetExporter) StartApi() {
@@ -160,12 +162,20 @@ func (t *TargetExporter) getWorkloads(g *gin.Context) {
 			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+
+		minCpuLimit, err := kubeclient.GetMinCpu(pod)
+		if err != nil && err.Error() != "job min annotation not found" {
+			g.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
 		workloads[i] = Workload{
 			Name:           pod.Name,
 			Status:         string(pod.Status.Phase),
 			SubmissionDate: pod.CreationTimestamp.String(),
 			NodeName:       pod.Spec.NodeName,
 			CpuTarget:      int(target),
+			MinCpuLimit:    minCpuLimit,
 		}
 	}
 	g.JSON(http.StatusOK, WorkloadsList{Workloads: workloads})
@@ -241,6 +251,7 @@ func (t *TargetExporter) postWorkloads(g *gin.Context) {
 	opts := []scheduling.WorkloadSpawnOption{
 		scheduling.CpuTarget(payload.CpuTarget),
 		scheduling.JobLength(payload.JobLength),
+		scheduling.MinCpuLimit(payload.MinCpuLimit),
 		scheduling.CpuCount(payload.CpuCount),
 		scheduling.WorkloadType(string(payload.WorkloadType)),
 	}
@@ -419,7 +430,7 @@ func (t *TargetExporter) putAutomaticJobSpawn(g *gin.Context) {
 
 func (t *TargetExporter) getServerOnOff(g *gin.Context) {
 	g.JSON(http.StatusOK, gin.H{
-		"enabled": t.o.IsSchedulableEnabled(),
+		"enabled": t.o.IsServerOnOffEnabled(),
 	})
 }
 
