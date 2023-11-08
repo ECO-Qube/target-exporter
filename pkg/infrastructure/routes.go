@@ -123,6 +123,9 @@ func (t *TargetExporter) StartApi() {
 		v1.GET("/server-on-off", t.getServerOnOff)
 		v1.PUT("/server-on-off", t.putServerOnOff)
 
+		v1.GET("/reduce-targets", t.getReduceTargets)
+		v1.PUT("/reduce-targets", t.putReduceTargets)
+
 		v1.POST("/job-scenario", t.postJobScenario)
 	}
 	srv := &http.Server{
@@ -445,6 +448,29 @@ func (t *TargetExporter) putServerOnOff(g *gin.Context) {
 		t.o.StartServerOnOff()
 	} else {
 		t.o.StopServerOnOff()
+	}
+	g.JSON(http.StatusOK, gin.H{
+		"message": "success",
+	})
+}
+
+func (t *TargetExporter) getReduceTargets(g *gin.Context) {
+	g.JSON(http.StatusOK, gin.H{
+		"enabled": t.o.IsReduceTargetsEnabled(),
+	})
+}
+
+func (t *TargetExporter) putReduceTargets(g *gin.Context) {
+	payload := SchedulableRequest{}
+	if err := g.BindJSON(&payload); err != nil {
+		g.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if payload.Enabled {
+		t.o.StartReduceTargets()
+	} else {
+		t.o.StopReduceTargets()
 	}
 	g.JSON(http.StatusOK, gin.H{
 		"message": "success",

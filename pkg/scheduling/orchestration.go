@@ -107,6 +107,7 @@ type Orchestrator struct {
 	schedulable       *SchedulableStrategy
 	tawa              *TawaStrategy
 	serverOnOff       *ServerOnOffStrategy
+	reduceTargets     *ReduceTargetsStrategy
 	targets           map[string]*Target
 	pyzhmNodeMappings map[string]string
 	setpoints         []float64
@@ -128,13 +129,13 @@ func NewOrchestrator(kubeClient *Kubeclient, promClient *Promclient, pyzhmClient
 		schedulable:       schedulableStrategy,
 		tawa:              NewTawaStrategy(kubeClient, promClient, logger),
 		serverOnOff:       serverOnOff,
+		reduceTargets:     NewReduceTargetsStrategy(promClient, kubeClient, targets, setpoints, logger),
 		targets:           targets,
 		pyzhmNodeMappings: pyzhmNodeMappings,
 		setpoints:         setpoints,
 		logger:            logger,
 	}
 	go o.CheckStartJobs()
-	//go o.ReduceTargets()
 	return o
 }
 
@@ -184,6 +185,18 @@ func (o *Orchestrator) StopServerOnOff() {
 
 func (o *Orchestrator) IsServerOnOffEnabled() bool {
 	return o.serverOnOff.IsRunning()
+}
+
+func (o *Orchestrator) StartReduceTargets() {
+	o.reduceTargets.Start()
+}
+
+func (o *Orchestrator) StopReduceTargets() {
+	o.reduceTargets.Stop()
+}
+
+func (o *Orchestrator) IsReduceTargetsEnabled() bool {
+	return o.reduceTargets.IsRunning()
 }
 
 // AddWorkload adds a workload to the queue (for now, it spawns it directly).
@@ -307,35 +320,4 @@ func (o *Orchestrator) CheckStartJobs() {
 		}
 		time.Sleep(3 * time.Second)
 	}
-}
-
-func (o *Orchestrator) ReduceTargets() {
-	// If targets are below their target since X time, reduce to previous set point
-	for {
-		avgCpuUsage, err := o.promClient.GetAvgCpuUsages(5)
-		if err != nil {
-			o.logger.Error("failed to get avg cpu usages", zap.Error(err))
-			return
-		}
-		for nodeName, target := range o.targets {
-			for _, avgUsage := range avgCpuUsage {
-				if avgUsage.NodeName == nodeName && avgUsage.Data < target.GetTarget() {
-					// Reduce target
-					o.logger.Info("reducing target", zap.String("node", nodeName), zap.Float64("target", target.GetTarget()))
-					target.Set(getLowerSetpoint(o.setpoints, target.GetTarget()))
-				}
-			}
-		}
-		time.Sleep(1 * time.Second)
-	}
-}
-
-func getLowerSetpoint(setpoints []float64, currentTarget float64) float64 {
-	for _, setpoint := range setpoints {
-		if setpoint < currentTarget {
-			return setpoint
-		}
-	}
-	// If it's already the lowest, don't change it
-	return currentTarget
 }
